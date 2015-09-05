@@ -18,9 +18,12 @@ $apiKey = '';
 // Title of report 
 $title = 'YouTube Caption Auditor (YTCA) Report'; 
 
-// To include only relatively high traffic videos, set $minViews to a positive integer 
-// This can help with prioritization if it isn't feasible to caption everything
+// To include only relatively high traffic videos:
+// 1. set $includeHighTraffic to true; set to false to skip this analysis
+// 2. set $minViews to a positive integer 
 // If $minViews = 0, YTCA uses the mean # of views per channel as a traffic threshold 
+// Analyzing high traffic videos separately can help with prioritization if it isn't feasible to caption everything
+$includeHighTraffic = true; 
 $minViews = 0; 
 
 // The report highlights channels that are either doing good or bad at captioning 
@@ -70,7 +73,7 @@ if ($numChannels > 0) {
     }
     $i++;  
   }
-  showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$minViews);
+  showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$includeHighTraffic,$minViews);
 }
 else { 
   echo 'There are no channels.<br/>';
@@ -183,7 +186,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
   return $videos;    
 }
 
-function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$minViews) { 
+function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$includeHighTraffic,$minViews) { 
 
   if ($numChannels > 0) {
     echo "<table>\n";
@@ -196,11 +199,15 @@ function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$minVie
     echo '<th scope="col"># Captioned</th>'."\n";
     echo '<th scope="col">% Captioned</th>'."\n";
     echo '<th scope="col">Mean # Views per Video</th>'."\n";
-    echo '<th scope="col"># Videos High Traffic</th>'."\n";
-    echo '<th scope="col"># Captioned High Traffic</th>'."\n";
-    echo '<th scope="col">% Captioned High Traffic</th>'."\n";    
+    if ($includeHighTraffic) {
+      echo '<th scope="col"># Videos High Traffic</th>'."\n";
+      echo '<th scope="col"># Captioned High Traffic</th>'."\n";
+      echo '<th scope="col">% Captioned High Traffic</th>'."\n";    
+    }
     echo '<th scope="col">Duration Uncaptioned</th>'."\n";
-    echo '<th scope="col">Duration Uncaptioned High Traffic</th>'."\n";
+    if ($includeHighTraffic) {
+      echo '<th scope="col">Duration Uncaptioned High Traffic</th>'."\n";
+    }
     echo "</tr>\n";
     if ($resultsField = $_POST['results']) { 
       // this is not the first channel processed 
@@ -214,9 +221,11 @@ function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$minVie
         $totalDuration = 0;
         $totalCaptioned = 0;
         $totalDurationUncaptioned = 0;
-        $totalVideosHighTraffic = 0; 
-        $totalCaptionedHighTraffic = 0; 
-        $totalDurationUncaptionedHighTraffic = 0; 
+        if ($includeHighTraffic) {
+          $totalVideosHighTraffic = 0; 
+          $totalCaptionedHighTraffic = 0; 
+          $totalDurationUncaptionedHighTraffic = 0; 
+        }
         
         while ($i < $numResults) { 
           if (strlen($results[$i])>0) { 
@@ -241,15 +250,21 @@ function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$minVie
             $totalCaptioned += $resultsData[5];
             echo '<td class="data">'.number_format($resultsData[6],1)."%</td>\n"; // percent captioned    
             echo '<td class="data">'.number_format($resultsData[7])."</td>\n"; // mean # of views  
-            echo '<td class="data">'.number_format($resultsData[8])."</td>\n"; // # videos high traffic
-            $totalVideosHighTraffic += $resultsData[8];                
-            echo '<td class="data">'.number_format($resultsData[9])."</td>\n"; // # captioned high traffic
-            $totalCaptionedHighTraffic += $resultsData[9];
-            echo '<td class="data">'.number_format($resultsData[10],1)."%</td>\n"; // % captioned high traffic                      
-            echo '<td class="data">'.number_format($resultsData[11])."</td>\n"; // duration uncaptioned
-            $totalDurationUncaptioned += $resultsData[11];
-            echo '<td class="data">'.number_format($resultsData[12])."</td>\n"; // duration uncaptioned high traffic                
-            $totalDurationUncaptionedHighTraffic += $resultsData[12];
+            if ($includeHighTraffic) {
+              echo '<td class="data">'.number_format($resultsData[8])."</td>\n"; // # videos high traffic
+              $totalVideosHighTraffic += $resultsData[8];                
+              echo '<td class="data">'.number_format($resultsData[9])."</td>\n"; // # captioned high traffic
+              $totalCaptionedHighTraffic += $resultsData[9];
+              echo '<td class="data">'.number_format($resultsData[10],1)."%</td>\n"; // % captioned high traffic              
+              echo '<td class="data">'.number_format($resultsData[11])."</td>\n"; // duration uncaptioned
+              $totalDurationUncaptioned += $resultsData[11];
+              echo '<td class="data">'.number_format($resultsData[12])."</td>\n"; // duration uncaptioned high traffic                
+              $totalDurationUncaptionedHighTraffic += $resultsData[12];
+            }
+            else { 
+              echo '<td class="data">'.number_format($resultsData[8])."</td>\n"; // duration uncaptioned
+              $totalDurationUncaptioned += $resultsData[8];
+            }
             echo "</tr>\n";
           }
           $i++; 
@@ -267,21 +282,25 @@ function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$minVie
     $pctCaptioned = round($numCaptioned/$numVideos * 100,1); 
     $durationUncaptioned = calcDuration($videos,$numVideos,'false');
     $totalDurationUncaptioned += $durationUncaptioned;
-    $totalDurationUncaptionedHighTraffic += $durationUncaptionedHighTraffic;
+    if ($includeHighTraffic) {
+      $totalDurationUncaptionedHighTraffic += $durationUncaptionedHighTraffic;
+    }
     $avgViews = calcAvgViews($videos,$numVideos); // returns an integer (don't need high precision)
-    if ($minViews > 0) { 
-      $highTrafficThreshold = $minViews; 
+    if ($includeHighTraffic) { 
+      if ($minViews > 0) { 
+        $highTrafficThreshold = $minViews; 
+      }
+      else { 
+        $highTrafficThreshold = $avgViews; 
+      }    
+      $numVideosHighTraffic = countHighTraffic($videos,$numVideos,$highTrafficThreshold);
+      $totalVideosHighTraffic += $numVideosHighTraffic;
+      $numCaptionedHighTraffic = countCaptioned($videos,$numVideos,$highTrafficThreshold);
+      $totalCaptionedHighTraffic += $numCaptionedHighTraffic;
+      $pctCaptionedHighTraffic = round($numCaptionedHighTraffic/$numVideosHighTraffic * 100,1);
+      $durationUncaptionedHighTraffic = calcDuration($videos,$numVideos,'false',$highTrafficThreshold);
+      $totalDurationUncaptionedHighTraffic += $durationUncaptionedHighTraffic;
     }
-    else { 
-      $highTrafficThreshold = $avgViews; 
-    }
-    $numVideosHighTraffic = countHighTraffic($videos,$numVideos,$highTrafficThreshold);
-    $totalVideosHighTraffic += $numVideosHighTraffic;
-    $numCaptionedHighTraffic = countCaptioned($videos,$numVideos,$highTrafficThreshold);
-    $totalCaptionedHighTraffic += $numCaptionedHighTraffic;
-    $pctCaptionedHighTraffic = round($numCaptionedHighTraffic/$numVideosHighTraffic * 100,1);
-    $durationUncaptionedHighTraffic = calcDuration($videos,$numVideos,'false',$highTrafficThreshold);
-    $totalDurationUncaptionedHighTraffic += $durationUncaptionedHighTraffic;
     
     // add current channel's data to the table     
     echo '<tr'; 
@@ -305,11 +324,15 @@ function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$minVie
     echo '<td class="data">'.number_format($numCaptioned)."</td>\n";
     echo '<td class="data">'.$pctCaptioned."%</td>\n";      
     echo '<td class="data">'.number_format($avgViews)."</td>\n";      
-    echo '<td class="data">'.number_format($numVideosHighTraffic)."</td>\n";
-    echo '<td class="data">'.number_format($numCaptionedHighTraffic)."</td>\n";
-    echo '<td class="data">'.number_format($pctCaptionedHighTraffic,1)."%</td>\n";      
+    if ($includeHighTraffic) {  
+      echo '<td class="data">'.number_format($numVideosHighTraffic)."</td>\n";
+      echo '<td class="data">'.number_format($numCaptionedHighTraffic)."</td>\n";
+      echo '<td class="data">'.number_format($pctCaptionedHighTraffic,1)."%</td>\n";      
+    }
     echo '<td class="data">'.number_format($durationUncaptioned)."</td>\n";      
-    echo '<td class="data">'.number_format($durationUncaptionedHighTraffic)."</td>\n";      
+    if ($includeHighTraffic) {
+      echo '<td class="data">'.number_format($durationUncaptionedHighTraffic)."</td>\n";      
+    }
     echo "</tr>\n";
 
     // add a totals row 
@@ -321,21 +344,27 @@ function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$minVie
     $totalPctCaptioned = round($totalCaptioned/$totalVideos * 100,1);       
     echo '<td class="data">'.$totalPctCaptioned."%</td>\n";
     echo '<td class="data">--</td>'."\n"; // avg is only calculated per channel; no "total avg" needed
-    echo '<td class="data">'.number_format($totalVideosHighTraffic)."</td>\n";
-    echo '<td class="data">'.number_format($totalCaptionedHighTraffic)."</td>\n";
-    $totalPctCaptionedHighTraffic = round($totalCaptionedHighTraffic/$totalVideosHighTraffic * 100,1);           
-    echo '<td class="data">'.$totalPctCaptionedHighTraffic."%</td>\n";      
+    if ($includeHighTraffic) {
+      echo '<td class="data">'.number_format($totalVideosHighTraffic)."</td>\n";
+      echo '<td class="data">'.number_format($totalCaptionedHighTraffic)."</td>\n";
+      $totalPctCaptionedHighTraffic = round($totalCaptionedHighTraffic/$totalVideosHighTraffic * 100,1);           
+      echo '<td class="data">'.$totalPctCaptionedHighTraffic."%</td>\n";      
+    }
     echo '<td class="data">'.number_format($totalDurationUncaptioned)."</td>\n";
-    echo '<td class="data">'.number_format($totalDurationUncaptionedHighTraffic)."</td>\n";
+    if ($includeHighTraffic) {
+      echo '<td class="data">'.number_format($totalDurationUncaptionedHighTraffic)."</td>\n";
+    }
     echo "</tr>\n";
     echo "</table>\n";
     
-    echo '<p class="footnote">&quot;<em>High traffic</em>&quot; = greater than '; 
-    if ($minViews > 0) { 
-      echo $minViews.' views</p>'."\n"; 
-    }
-    else { 
-      echo 'the mean number of views for this channel</p>'."\n";
+    if ($includeHighTraffic) {
+      echo '<p class="footnote">&quot;<em>High traffic</em>&quot; = greater than '; 
+      if ($minViews > 0) { 
+        echo $minViews.' views</p>'."\n"; 
+      }
+      else { 
+        echo 'the mean number of views for this channel</p>'."\n";
+      }
     }
     
     if ($c < ($numChannels - 1)) { 
@@ -357,11 +386,18 @@ function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$minVie
       echo $numCaptioned.',';
       echo $pctCaptioned.','; 
       echo $avgViews.',';
-      echo $numVideosHighTraffic.',';
-      echo $numCaptionedHighTraffic.',';
-      echo $pctCaptionedHighTraffic.',';
-      echo $durationUncaptioned.',';
-      echo $durationUncaptionedHighTraffic."\n";
+      if ($includeHighTraffic) {
+        echo $numVideosHighTraffic.',';
+        echo $numCaptionedHighTraffic.',';
+        echo $pctCaptionedHighTraffic.',';
+      }
+      echo $durationUncaptioned;
+      if ($includeHighTraffic) {
+        echo ','.$durationUncaptionedHighTraffic."\n";
+      }
+      else { 
+        echo "\n";
+      }
       echo "</textarea>\n";
       
       $nextIndex = $c+1; 
