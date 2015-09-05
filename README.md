@@ -50,8 +50,9 @@ YouTube Channel IDs
 -------------------
 
 The Configuration block includes an array of YouTube Channel IDs. 
-The YouTube Channel ID is a 24-character string, which sometimes appears in the URL 
-for the channel. For example, the URL for the main University of Washington channel is 
+The YouTube Channel ID is a 24-character string that starts with the characters "UC". 
+This sometimes appears in the URL for the channel. 
+For example, the URL for the main University of Washington channel is 
 
 **https://www.youtube.com/channel/UCJgq3uJ5jFCbNB06TC9BFBw** 
 
@@ -63,6 +64,20 @@ find the channel ID for that channel:
 1. View source 
 2. Search the source code for the attribute *data-channel-external-id*
 3. The value of that attribute is the channel ID 
+
+Alternatively, you can substitute the *user name* for any channel ID.
+As long as it's a valid user name and is not a 24-character string starting with "UC", 
+YTCA can look up the channel ID without you having to follow the above steps. 
+
+For example, here's an alternative URL for accessing the main University of Washington channel: 
+
+**https://www.youtube.com/user/uwhuskies** 
+ 
+The user name is **uwhuskies** 
+
+In the YTCA Configuration block we can enter either **uwhuskies** or **UCJgq3uJ5jFCbNB06TC9BFBw** 
+as the channel ID; both work just fine, although the former adds overhead because YTCA needs to 
+lookup each unknown channel ID via an extra query to the YouTube Data API.  
 
 Output
 ------
@@ -85,6 +100,7 @@ Quotas can be estimated using YouTube's [Quota Calculator][].
 As of June 2015, quota costs associated with running this application are:
 * 100 units for each channel (search query) 
 * 5 units for each video 
+* 5 units for each channel ID lookup from a user name
 
 For example, if you have a daily quota of 5,000,000 units you could run this application 
 to collect data from 100 channels (10,000 units) containing 998,000 videos.   

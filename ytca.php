@@ -46,7 +46,7 @@ $includeChannelID = false;
 
 // Copy and uncomment the following line for each YouTube channel. Assign 'name' and 'id' as follows: 
 // 'name' - The name of the channel as you would like it to appear in the report 
-// 'id' - The 24-character YouTube Channel ID (see README.md for more about channel IDs) 
+// 'id' - either the 24-character YouTube Channel ID or its associated username (see README.md for more about channel IDs) 
 // $channels[] = array('name'=>'Name of Channel','id'=>'channel_id');
 
 // Optionally, the $channels array can include additional keys. 
@@ -76,6 +76,10 @@ if ($numChannels > 0) {
     $c = 0; 
   }
   $channelId = $channels[$c]['id'];     
+  if (!(ischannelId($channelId))) { 
+    // this is not a valid channel ID; must be a username
+    $channelId = getChannelId($apiKey,$channelId);    
+  }
   $channelQuery = buildYouTubeQuery('search',$channelId,$apiKey);
   $channel['name'] = $channels[$c]['name'];
   $channel['id'] = $channelId;
@@ -107,7 +111,7 @@ if ($numChannels > 0) {
     echo '<p class="error">Unable to retrieve file: ';
     echo '<a href="'.$channelQuery.'">'.$channelQuery.'</a></p>'."\n";
   }
-  showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includeChannelID);
+  showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includechannelId);
 }
 else { 
   echo 'There are no channels.<br/>';
@@ -138,10 +142,34 @@ function fileGetContents($url) {
   return $output;
 }  
   
+function getChannelId($apiKey,$userName) { 
+
+  $query = buildYouTubeQuery('channels', $userName, $apiKey); 
+  if ($content = fileGetContents($query)) { 
+    $json = json_decode($content,true);
+    $channelId = $json['items'][0]['id'];
+    if (isChannelId($channelId)) { 
+      return $channelId;
+    }
+  }
+  return false; 
+}
+
+function isChannelId($string) { 
+
+  if (strlen(trim($string)) == 24) { 
+    if (substr($string,0,2) == 'UC') { 
+      return true; 
+    }    
+  }
+  return false;
+}      
+  
 function buildYouTubeQuery($which, $id, $apiKey, $nextPageToken=NULL) { 
 
-  // $which is either 'search', 'channel', or 'videos' 
-  // $id is a channel ID for 'search' & 'channels' queries; or a video ID for 'videos' query
+  // $which is either 'search', 'channels', or 'videos' 
+  // $id is a channel ID for 'search' queries; or a video ID for 'videos' query
+  // For 'channels' queries $id is a username 
         
   if ($which == 'search') { 
     // Cost = 100 units 
@@ -158,11 +186,13 @@ function buildYouTubeQuery($which, $id, $apiKey, $nextPageToken=NULL) {
   elseif ($which == 'channels') { 
     // Cost = 5 units 
     // Cheaper than search, but doesn't include individual video data (not even ids) 
+    // This is currently only used for looking up channel IDs 
     $request = 'https://www.googleapis.com/youtube/v3/channels?'; 
     $request .= 'key='.$apiKey;
-    $request .= '&id='.$id;
-    $request .= '&part=statistics,contentDetails';
-    $request .= '&maxResults=50'; 
+    $request .= '&forUsername='.$id;
+    // $request .= '&id='.$id;
+    $request .= '&part=id';
+    $request .= '&maxResults=1'; 
   }
   elseif ($which == 'videos') { 
     // Cost = 5 units
@@ -235,14 +265,14 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
   return $videos;    
 }
 
-function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includeChannelID) {
+function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includechannelId) {
 
   if ($numChannels > 0) {
     echo "<table>\n";
     echo "<tr>\n";
     echo '<th scope="col">ID</th>'."\n";
     echo '<th scope="col">YouTube Channel</th>'."\n";
-    if ($includeChannelID) { 
+    if ($includechannelId) { 
       echo '<th scope="col">YouTube ID</th>'."\n";
     }
     $numMeta = sizeof($metaKeys);
@@ -324,7 +354,7 @@ function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighli
               echo '</a>';
             }
             echo "</td>\n"; 
-            if ($includeChannelID) {
+            if ($includechannelId) {
               echo '<td>'.$resultsData[2]."</td>\n"; // channel id  
             }
             // If channel included supplemental meta data, it was stored at end of $resultsData 
@@ -441,7 +471,7 @@ function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighli
       echo '</a>';
     }
     echo "</td>\n"; 
-    if ($includeChannelID) {
+    if ($includechannelId) {
       echo '<td>'.$channel['id']."</td>\n";
     }
     // Display supplemental meta data, if any exists in $channels array 
@@ -472,7 +502,7 @@ function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighli
     // add a totals row 
     echo '<tr class="totals">'."\n";
     echo '<th scope="row" '; 
-    if ($includeChannelID) { 
+    if ($includechannelId) { 
       $colSpan = 3 + $numMeta;
     }
     else { 
