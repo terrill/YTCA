@@ -32,11 +32,14 @@ $minViews = 0;
 $includeHighlights = true; 
 $goodPct = 50; // Percentages >= this value are "good" 
 $badPct = 0; // Percentages <= this value are "bad" 
-$goodColor = '#DCFFB9'; // light green
-$badColor = '#FFB9B9'; // light red  
+$goodColor = '#99FF99'; // light green
+$badColor = '#FFD7D7'; // light red  
 // labels are added as a title attribute for the channel name 
 $goodLabel = 'Exemplary channel'; 
 $badLabel = 'Needs work'; 
+
+// Set $includeLinks to true to make channel names hyperlinks to the YouTube channel; otherwise set to false 
+$includeLinks = true; 
 
 // Copy and uncomment the following line for each YouTube channel. Assign 'name' and 'id' as follows: 
 // 'name' - The name of the channel as you would like it to appear in the report 
@@ -77,7 +80,7 @@ if ($numChannels > 0) {
     }
     $i++;  
   }
-  showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews);
+  showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks);
 }
 else { 
   echo 'There are no channels.<br/>';
@@ -190,7 +193,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
   return $videos;    
 }
 
-function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews) { 
+function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks) { 
 
   if ($numChannels > 0) {
     echo "<table>\n";
@@ -258,7 +261,15 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
             if ($channelTitle) { 
               echo $channelTitle;
             }
-            echo '>'.$resultsData[1]."</td>\n"; // channel name 
+            echo '>'; 
+            if ($includeLinks) { 
+              echo '<a href="https://www.youtube.com/channel/'.$resultsData[2].'">'; // channel name 
+            }
+            echo $resultsData[1]; 
+            if ($includeLinks) { 
+              echo '</a>';
+            }
+            echo "</td>\n"; 
             echo '<td>'.$resultsData[2]."</td>\n"; // channel id  
             echo '<td class="data">'.number_format($resultsData[3])."</td>\n"; // number of videos 
             $totalVideos += $resultsData[3];
@@ -350,7 +361,15 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
     if ($channelTitle) { 
       echo $channelTitle;
     }
-    echo '>'.$channel['name']."</td>\n";
+    echo '>';
+    if ($includeLinks) { 
+      echo '<a href="https://www.youtube.com/channel/'.$resultsData[2].'">'; // channel name
+    }
+    echo $resultsData[1]; 
+    if ($includeLinks) { 
+      echo '</a>';
+    }
+    echo "</td>\n"; 
     echo '<td>'.$channel['id']."</td>\n";
     echo '<td class="data">'.number_format($numVideos)."</td>\n";
     echo '<td class="data">'.number_format($duration)."</td>\n";
@@ -589,6 +608,10 @@ function showTop($title,$goodColor,$badColor) {
     td.data { 
       text-align: right;
     }
+    td a { 
+      color: #474747; 
+      text-decoration: underline;
+    }    
     tr.goodChannel th, 
     tr.goodChannel td { 
       background-color: $goodColor; 
