@@ -41,6 +41,9 @@ $badLabel = 'Needs work';
 // Set $includeLinks to true to make channel names hyperlinks to the YouTube channel; otherwise set to false 
 $includeLinks = true; 
 
+// Set $includeChannelID to true to include a YouTube Channel ID column in the output; otherwise false 
+$includeChannelID = false;
+
 // Copy and uncomment the following line for each YouTube channel. Assign 'name' and 'id' as follows: 
 // 'name' - The name of the channel as you would like it to appear in the report 
 // 'id' - The 24-character YouTube Channel ID (see README.md for more about channel IDs) 
@@ -80,7 +83,7 @@ if ($numChannels > 0) {
     }
     $i++;  
   }
-  showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks);
+  showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includeChannelID);
 }
 else { 
   echo 'There are no channels.<br/>';
@@ -193,14 +196,16 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
   return $videos;    
 }
 
-function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks) { 
+function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includeChannelID) { 
 
   if ($numChannels > 0) {
     echo "<table>\n";
     echo "<tr>\n";
     echo '<th scope="col">ID</th>'."\n";
-    echo '<th scope="col">Channel</th>'."\n";
-    echo '<th scope="col">YouTube ID</th>'."\n";
+    echo '<th scope="col">YouTube Channel</th>'."\n";
+    if ($includeChannelID) { 
+      echo '<th scope="col">YouTube ID</th>'."\n";
+    }
     echo '<th scope="col"># Videos</th>'."\n";
     echo '<th scope="col">Duration</th>'."\n";
     echo '<th scope="col"># Captioned</th>'."\n";
@@ -270,7 +275,9 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
               echo '</a>';
             }
             echo "</td>\n"; 
-            echo '<td>'.$resultsData[2]."</td>\n"; // channel id  
+            if ($includeChannelID) {
+              echo '<td>'.$resultsData[2]."</td>\n"; // channel id  
+            }
             echo '<td class="data">'.number_format($resultsData[3])."</td>\n"; // number of videos 
             $totalVideos += $resultsData[3];
             echo '<td class="data">'.number_format($resultsData[4])."</td>\n"; // duration 
@@ -370,7 +377,9 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
       echo '</a>';
     }
     echo "</td>\n"; 
-    echo '<td>'.$channel['id']."</td>\n";
+    if ($includeChannelID) {
+      echo '<td>'.$channel['id']."</td>\n";
+    }
     echo '<td class="data">'.number_format($numVideos)."</td>\n";
     echo '<td class="data">'.number_format($duration)."</td>\n";
     echo '<td class="data">'.number_format($numCaptioned)."</td>\n";
@@ -389,7 +398,14 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
 
     // add a totals row 
     echo '<tr class="totals">'."\n";
-    echo '<th scope="row" colspan="3">TOTALS</th>'."\n";
+    echo '<th scope="row" '; 
+    if ($includeChannelID) { 
+      echo 'colspan="3"';
+    }
+    else { 
+      echo 'colspan="2"';      
+    }
+    echo '>TOTALS</th>'."\n";
     echo '<td class="data">'.number_format($totalVideos)."</td>\n";
     echo '<td class="data">'.number_format($totalDuration)."</td>\n";
     echo '<td class="data">'.number_format($totalCaptioned)."</td>\n";
