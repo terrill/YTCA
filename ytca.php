@@ -49,6 +49,13 @@ $includeChannelID = false;
 // 'id' - The 24-character YouTube Channel ID (see README.md for more about channel IDs) 
 // $channels[] = array('name'=>'Name of Channel','id'=>'channel_id');
 
+// Optionally, the $channels array can include additional keys. 
+// Any keys other than 'name' and 'id' will be used as column headers in the report
+// and their values will be displayed as data for that channel in the report 
+// This can be useful if there is additional known meta data that you would like to include in the report 
+// Example: 
+// $channels[] = array('name'=>'Bernie Sanders','id'=>'UCH1dpzjCEiGAt8CXkryhkZg','Party'=>'Democrat');
+  
 /***********************
  *                     *
  *  END CONFIGURATION  *
@@ -57,6 +64,7 @@ $includeChannelID = false;
 
 error_reporting(E_ERROR | E_PARSE); 
 ini_set(max_execution_time,900); // in seconds; increase if script is timing out on large channels
+
 showTop($title,$goodColor,$badColor); 
 $timeStart = microtime(true); // for benchmarking
 $numChannels = sizeof($channels);
@@ -71,19 +79,35 @@ if ($numChannels > 0) {
   $channelQuery = buildYouTubeQuery('search',$channelId,$apiKey);
   $channel['name'] = $channels[$c]['name'];
   $channel['id'] = $channelId;
-  if ($content = @file_get_contents($channelQuery)) { 
-    $json = json_decode($content,true);
+  $numKeys = sizeof($channels[0]); 
+  if ($numKeys > 2) { 
+    // there is supplemental meta data in the array 
+    $keys = array_keys($channels[0]);
+    $i = 2;
+    while ($i < $numKeys) { 
+      $key = $keys[$i];
+      $metaKeys[] = $key;
+      $channel[$key] = $channels[$c][$key];
+      $i++; 
+    }
+  }  
+  if ($content = fileGetContents($channelQuery)) {  
+    $json = json_decode($content,true);    
     $numVideos = $json['pageInfo']['totalResults'];
     $channel['videoCount'] = $numVideos; 
     if ($numVideos > 0) { 
       $channel['videos'] = getVideos($channelId,$json,$numVideos,$apiKey);
     }
     else { 
-      echo 'URL Error: '.$query."<br/>\n";
+      echo 'URL Error: '.$channelQuery."<br/>\n";
     }
     $i++;  
   }
-  showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includeChannelID);
+  else { 
+    echo '<p class="error">Unable to retrieve file: ';
+    echo '<a href="'.$channelQuery.'">'.$channelQuery.'</a></p>'."\n";
+  }
+  showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includeChannelID);
 }
 else { 
   echo 'There are no channels.<br/>';
@@ -98,7 +122,22 @@ if ($c < ($numChannels-1)) {
   echo '<p>Total run time: '.$time.' seconds</p>'."\n";  
 }
 echo "</body>\n</html>";
-    
+
+function fileGetContents($url) { 
+
+  // PHP fileGetContents() is resulting in intermittent errors 
+  // Not sure why but curl seems to be more reliable  
+  if (!function_exists('curl_init')){ 
+    die('CURL is not installed!');
+  }
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, $url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  $output = curl_exec($ch);
+  curl_close($ch);
+  return $output;
+}  
+  
 function buildYouTubeQuery($which, $id, $apiKey, $nextPageToken=NULL) { 
 
   // $which is either 'search', 'channel', or 'videos' 
@@ -167,7 +206,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
       // Therefore we need to refresh $json with the next page of data 
       $nextPageToken = $json['nextPageToken'];        
       $channelQuery = buildYouTubeQuery('search',$channelId,$apiKey,$nextPageToken);
-      if ($content = @file_get_contents($channelQuery)) { 
+      if ($content = fileGetContents($channelQuery)) { 
         $json = json_decode($content,true);
       }
     }
@@ -181,7 +220,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
       // now get additional data about this video via a 'videos' query         
       $videoQuery = buildYouTubeQuery('videos', $videoId, $apiKey); 
       $videos[$v]['query'] = $videoQuery; // added for debugging purposes
-      if ($videoContent = @file_get_contents($videoQuery)) { 
+      if ($videoContent = fileGetContents($videoQuery)) { 
         $videos[$v]['status'] = 'Success!'; // added for debugging purposes
         $videoJson = json_decode($videoContent,true);
         $videos[$v]['duration'] = $videoJson['items'][0]['contentDetails']['duration'];
@@ -196,7 +235,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
   return $videos;    
 }
 
-function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includeChannelID) { 
+function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includeChannelID) {
 
   if ($numChannels > 0) {
     echo "<table>\n";
@@ -205,6 +244,16 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
     echo '<th scope="col">YouTube Channel</th>'."\n";
     if ($includeChannelID) { 
       echo '<th scope="col">YouTube ID</th>'."\n";
+    }
+    $numMeta = sizeof($metaKeys);
+    if ($numMeta > 0) { 
+      // there is supplemental meta data in the array 
+      // display a column header for each meta data key  
+      $i = 0;
+      while ($i < $numMeta) { 
+        echo '<th scope="col">'.$metaKeys[$i]."</th>\n";
+        $i++; 
+      }
     }
     echo '<th scope="col"># Videos</th>'."\n";
     echo '<th scope="col">Duration</th>'."\n";
@@ -260,7 +309,7 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
             else { 
               echo '>'."\n";
               $channelTitle = NULL;
-            }
+            }            
             echo '<td>'.$resultsData[0]."</td>\n"; // column number 
             echo '<td'; 
             if ($channelTitle) { 
@@ -268,7 +317,7 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
             }
             echo '>'; 
             if ($includeLinks) { 
-              echo '<a href="https://www.youtube.com/channel/'.$resultsData[2].'">'; // channel name 
+              echo '<a href="https://www.youtube.com/channel/'.$resultsData[2].'">'; // channel name
             }
             echo $resultsData[1]; 
             if ($includeLinks) { 
@@ -278,6 +327,21 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
             if ($includeChannelID) {
               echo '<td>'.$resultsData[2]."</td>\n"; // channel id  
             }
+            // If channel included supplemental meta data, it was stored at end of $resultsData 
+            if ($numMeta) { 
+              if ($includeHighTraffic) { 
+                $metaIndex = 13; 
+              }              
+              else { 
+                $metaIndex = 9; 
+              }
+              $j = 0;
+              while ($j < $numMeta) { 
+                echo '<td>'.$resultsData[$metaIndex]."</td>\n";
+                $metaIndex++;
+                $j++; 
+              }
+            }            
             echo '<td class="data">'.number_format($resultsData[3])."</td>\n"; // number of videos 
             $totalVideos += $resultsData[3];
             echo '<td class="data">'.number_format($resultsData[4])."</td>\n"; // duration 
@@ -302,7 +366,7 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
               $totalDurationUncaptioned += $resultsData[8];
             }
             echo "</tr>\n";
-          }
+          }          
           $i++; 
         }
       }
@@ -370,9 +434,9 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
     }
     echo '>';
     if ($includeLinks) { 
-      echo '<a href="https://www.youtube.com/channel/'.$resultsData[2].'">'; // channel name
+      echo '<a href="https://www.youtube.com/channel/'.$channel['id'].'">'; 
     }
-    echo $resultsData[1]; 
+    echo $channel['name']; 
     if ($includeLinks) { 
       echo '</a>';
     }
@@ -380,11 +444,20 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
     if ($includeChannelID) {
       echo '<td>'.$channel['id']."</td>\n";
     }
+    // Display supplemental meta data, if any exists in $channels array 
+    if ($numMeta) { 
+      $i = 0;
+      while ($i < $numMeta) { 
+        $key = $metaKeys[$i];
+        echo '<td>'.$channel[$key].'</td>'."\n"; 
+        $i++; 
+      }
+    }    
     echo '<td class="data">'.number_format($numVideos)."</td>\n";
     echo '<td class="data">'.number_format($duration)."</td>\n";
     echo '<td class="data">'.number_format($numCaptioned)."</td>\n";
     echo '<td class="data">'.$pctCaptioned."%</td>\n";      
-    echo '<td class="data">'.number_format($avgViews)."</td>\n";      
+    echo '<td class="data">'.number_format($avgViews)."</td>\n";    
     if ($includeHighTraffic) {  
       echo '<td class="data">'.number_format($numVideosHighTraffic)."</td>\n";
       echo '<td class="data">'.number_format($numCaptionedHighTraffic)."</td>\n";
@@ -400,12 +473,12 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
     echo '<tr class="totals">'."\n";
     echo '<th scope="row" '; 
     if ($includeChannelID) { 
-      echo 'colspan="3"';
+      $colSpan = 3 + $numMeta;
     }
     else { 
-      echo 'colspan="2"';      
+      $colSpan = 2 + $numMeta; 
     }
-    echo '>TOTALS</th>'."\n";
+    echo 'colspan="'.$colSpan.'">TOTALS</th>'."\n";      
     echo '<td class="data">'.number_format($totalVideos)."</td>\n";
     echo '<td class="data">'.number_format($totalDuration)."</td>\n";
     echo '<td class="data">'.number_format($totalCaptioned)."</td>\n";
@@ -441,12 +514,8 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
       echo '<form action="#" method="POST">'."\n";
       echo '<textarea name="results">'."\n";
       echo $resultsField; // data from previous post 
-      if ($i) { 
-        echo $i.',';
-      }
-      else { // first channel
-        echo '1,';
-      }
+      $rowNum = $c + 1; 
+      echo $rowNum.',';
       echo '"'.addslashes($channel['name']).'",';
       echo '"'.addslashes($channel['id']).'",';
       echo $numVideos.',';
@@ -461,12 +530,20 @@ function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$good
       }
       echo $durationUncaptioned;
       if ($includeHighTraffic) {
-        echo ','.$durationUncaptionedHighTraffic."\n";
+        echo ','.$durationUncaptionedHighTraffic;
       }
-      else { 
-        echo "\n";
+      // Add supplemental meta data to end, since the number of fields is unknown
+      // (makes for easier retrieval) 
+      if ($numMeta) { 
+        $i = 0;
+        while ($i < $numMeta) { 
+          echo ',';
+          $key = $metaKeys[$i];
+          echo '"'.$channel[$key].'"'; 
+          $i++; 
+        }
       }
-      echo "</textarea>\n";
+      echo "\n</textarea>\n";
       
       $nextIndex = $c+1; 
       $nextColNum = $nextIndex+1; 
@@ -627,7 +704,7 @@ function showTop($title,$goodColor,$badColor) {
     td a { 
       color: #474747; 
       text-decoration: underline;
-    }    
+    }
     tr.goodChannel th, 
     tr.goodChannel td { 
       background-color: $goodColor; 
@@ -656,6 +733,9 @@ function showTop($title,$goodColor,$badColor) {
     }  
     textarea { 
       display: none;
+    }
+    p.error { 
+      font-weight: bold;
     }
     p.footnote { 
       margin-left: 2em;
