@@ -26,13 +26,17 @@ $title = 'YouTube Caption Auditor (YTCA) Report';
 $includeHighTraffic = true; 
 $minViews = 0; 
 
-// The report highlights channels that are either doing good or bad at captioning 
-// Using the following four variables, define the percentage of captioned videos that defines "good" vs "bad"  
-// and define the colors used to visually indicate good and bad channels  
+// Optionally, the report can highlight channels that are either doing good or bad at captioning 
+// To use this feature, set the following variables 
+// if $includeHighlights = false, all other variables are ignored 
+$includeHighlights = true; 
 $goodPct = 50; // Percentages >= this value are "good" 
-$goodColor = '#DCFFB9'; // light green
 $badPct = 0; // Percentages <= this value are "bad" 
+$goodColor = '#DCFFB9'; // light green
 $badColor = '#FFB9B9'; // light red  
+// labels are added as a title attribute for the channel name 
+$goodLabel = 'Exemplary channel'; 
+$badLabel = 'Needs work'; 
 
 // Copy and uncomment the following line for each YouTube channel. Assign 'name' and 'id' as follows: 
 // 'name' - The name of the channel as you would like it to appear in the report 
@@ -73,7 +77,7 @@ if ($numChannels > 0) {
     }
     $i++;  
   }
-  showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$includeHighTraffic,$minViews);
+  showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews);
 }
 else { 
   echo 'There are no channels.<br/>';
@@ -186,7 +190,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
   return $videos;    
 }
 
-function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$includeHighTraffic,$minViews) { 
+function showResults($c,$channel,$channels,$numChannels,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews) { 
 
   if ($numChannels > 0) {
     echo "<table>\n";
@@ -231,16 +235,30 @@ function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$includ
           if (strlen($results[$i])>0) { 
             $resultsData = str_getcsv($results[$i]); 
             echo '<tr data-pct="'.getType((int)$resultsData[6]).'" data-badPct="'.getType($badPct).'"';
-            // use $resultsData[6] (percent Captioned) to determine good or bad
-            if ($resultsData[6] >= $goodPct) { 
-              echo ' class="goodChannel">'."\n";
+            if ($includeHighlights) {
+              if ($resultsData[6] >= $goodPct) { 
+                echo ' class="goodChannel">'."\n";
+                $channelTitle = ' title="'.$goodLabel.'"';
+              }
+              elseif ($resultsData[6] <= $badPct) { 
+                echo ' class="badChannel">'."\n";      
+                $channelTitle = ' title="'.$badLabel.'"';
+              }
+              else { 
+                echo '>'."\n";
+                $channelTitle = NULL;
+              }
             }
-            elseif ($resultsData[6] <= $badPct) { 
-              echo ' class="badChannel">'."\n";      
+            else { 
+              echo '>'."\n";
+              $channelTitle = NULL;
             }
-            else echo '>'."\n";
             echo '<td>'.$resultsData[0]."</td>\n"; // column number 
-            echo '<td>'.$resultsData[1]."</td>\n"; // channel name 
+            echo '<td'; 
+            if ($channelTitle) { 
+              echo $channelTitle;
+            }
+            echo '>'.$resultsData[1]."</td>\n"; // channel name 
             echo '<td>'.$resultsData[2]."</td>\n"; // channel id  
             echo '<td class="data">'.number_format($resultsData[3])."</td>\n"; // number of videos 
             $totalVideos += $resultsData[3];
@@ -304,20 +322,35 @@ function showResults($c,$channel,$channels,$numChannels,$goodPct,$badPct,$includ
     
     // add current channel's data to the table     
     echo '<tr'; 
-    if ($pctCaptioned >= $goodPct) { 
-      echo ' class="goodChannel">'."\n";
+    if ($includeHighlights) {
+      if ($pctCaptioned >= $goodPct) { 
+        echo ' class="goodChannel">'."\n";
+        $channelTitle = ' title="'.$goodLabel.'"';
+      }
+      elseif ($pctCaptioned <= $badPct) { 
+        echo ' class="badChannel">'."\n";      
+        $channelTitle = ' title="'.$badLabel.'"';
+      }
+      else { 
+        echo '>'."\n";
+        $channelTitle = NULL;
+      }
     }
-    elseif ($pctCaptioned <= $badPct) { 
-      echo ' class="badChannel">'."\n";      
+    else { 
+      echo '>'."\n";
+      $channelTitle = NULL;      
     }
-    else echo '>'."\n";
     if ($numResults) { 
       echo '<td>'.$numResults."</td>\n";
     }
     else { // this is the first channel 
       echo '<td>1</td>'."\n";      
     }
-    echo '<td>'.$channel['name']."</td>\n";
+    echo '<td'; 
+    if ($channelTitle) { 
+      echo $channelTitle;
+    }
+    echo '>'.$channel['name']."</td>\n";
     echo '<td>'.$channel['id']."</td>\n";
     echo '<td class="data">'.number_format($numVideos)."</td>\n";
     echo '<td class="data">'.number_format($duration)."</td>\n";
