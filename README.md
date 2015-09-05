@@ -65,7 +65,7 @@ find the channel ID for that channel:
 2. Search the source code for the attribute *data-channel-external-id*
 3. The value of that attribute is the channel ID 
 
-Alternatively, you can substitute the *user name* for any channel ID.
+Alternatively, you can substitute the *user name* for any channel ID in the YTCA Configuration block.
 As long as it's a valid user name and is not a 24-character string starting with "UC", 
 YTCA can look up the channel ID without you having to follow the above steps. 
 
