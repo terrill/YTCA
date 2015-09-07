@@ -321,7 +321,7 @@ function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighli
         while ($i < $numResults) { 
           if (strlen($results[$i])>0) { 
             $resultsData = str_getcsv($results[$i]); 
-            echo '<tr data-pct="'.getType((int)$resultsData[6]).'" data-badPct="'.getType($badPct).'"';
+            echo '<tr';
             if ($includeHighlights) {
               if ($resultsData[6] >= $goodPct) { 
                 echo ' class="goodChannel">'."\n";
