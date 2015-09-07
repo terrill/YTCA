@@ -87,10 +87,12 @@ if ($numChannels > 0) {
   if ($numKeys > 2) { 
     // there is supplemental meta data in the array 
     $keys = array_keys($channels[0]);
-    $i = 2;
+    $i = 0;
     while ($i < $numKeys) { 
       $key = $keys[$i];
-      $metaKeys[] = $key;
+      if ($key !== 'name' && $key !== 'id') { 
+        $metaKeys[] = $key;
+      }
       $channel[$key] = $channels[$c][$key];
       $i++; 
     }
