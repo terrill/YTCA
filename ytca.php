@@ -14,37 +14,56 @@
 // See the YouTube API reference for instructions on obtaining an API key
 // https://developers.google.com/youtube/v3/docs/
 // Store API key in a local file
-
 $apiKeyFile = 'apikey'; // name of local file in which API key is stored
 
-// Title of report
+// Output (can be overwritten with parameter 'output' in URL)
+// Supported values: html, xml, json
+$output = 'html';
+
+// Report (can be overwritten with parameter 'report' in URL)
+// Supported values:
+//  summary - counts and other stats for each channel
+//  details - metadata, traffic data, and caption data for each video in results
+$report = 'summary';
+
+// Filter Type (can be overwritten with parameter 'filtertype' in URL)
+// Used in conjunction with Filter Value to filter videos based on views
+// This can be used to prioritize accessibility efforts on videos that have the highest traffic
+// Supported values:
+//   views - limit results to videos that have X or more views
+//   percentile - limit results to videos that fall into the X percentile for the channel based on views (e.g., the top 10%)
+//   count - limit results to the top X videos for the channel, based on views
+//   NULL - do not filter; include all videos in audit
+$filterType = NULL;
+
+// Filter Value (can be overwritten with parameter 'filtervalue' in URL)
+// Used to define the value of Filter Type, as explained above
+// Set to NULL if no filtering is used
+$filterValue = NULL;
+
+// Title of report (can be overwritten with URL-encoded parameter 'title' in URL)
 $title = 'YouTube Caption Auditor (YTCA) Report';
 
-// To include only relatively high traffic videos:
-// 1. set $includeHighTraffic to true; set to false to skip this analysis
-// 2. set $minViews to a positive integer
-// If $minViews = 0, YTCA uses the mean # of views per channel as a traffic threshold
-// Analyzing high traffic videos separately can help with prioritization if it isn't feasible to caption everything
-$includeHighTraffic = true;
-$minViews = 0;
-
-// Optionally, the report can highlight channels that are either doing good or bad at captioning
-// To use this feature, set the following variables
-// if $includeHighlights = false, all other variables are ignored
-$includeHighlights = true;
-$goodPct = 50; // Percentages >= this value are "good"
-$badPct = 0; // Percentages <= this value are "bad"
-$goodColor = '#99FF99'; // light green
-$badColor = '#FFD7D7'; // light red
-// labels are added as a title attribute for the channel name
-$goodLabel = 'Exemplary channel';
-$badLabel = 'Needs work';
-
-// Set $includeLinks to true to make channel names hyperlinks to the YouTube channel; otherwise set to false
+// Include Links
+// Set to true to make channel names hyperlinks to the YouTube channel; otherwise set to false
 $includeLinks = true;
 
-// Set $includeChannelID to true to include a YouTube Channel ID column in the output; otherwise false
-$includeChannelID = false;
+// Include Channel ID
+// Set to true to include a YouTube Channel ID column in the output; otherwise false
+$includeChannelId = false;
+
+// Highlights
+// Optionally, the report can highlight channels that are either doing good or bad at captioning
+// To use this feature, set the following variables
+// if $highlights['use'] is false, all other variables are ignored
+$highlights['use'] = true;
+$highlights['goodPct'] = 50; // Percentages >= this value are "good"
+$highlights['badPct'] = 0; // Percentages <= this value are "bad"
+$highlights['goodColor'] = '#99FF99'; // light green
+$highlights['badColor'] = '#FFD7D7'; // light red
+$highlights['goodLabel'] = 'Exemplary channel'; // title attribute on channel name for 'good' channels
+$highlights['badLabel'] = 'Needs work'; // title attribute on channel name for 'bad' channels
+
 
 /***********************
  *                     *
@@ -56,11 +75,45 @@ error_reporting(E_ERROR | E_PARSE);
 ini_set(max_execution_time,900); // in seconds; increase if script is timing out on large channels
 $apiKey = file_get_contents($apiKeyFile);
 
+// Override default variables with GET params
+if (isset($_GET['output'])) {
+  if (isValid('output',strtolower($_GET['output']))) {
+    $output = strtolower($_GET['output']);
+  }
+}
+if (isset($_GET['report'])) {
+  if (isValid('report',strtolower($_GET['report']))) {
+    $report = strtolower($_GET['report']);
+  }
+}
+if (isset($_GET['filtertype']) && isset($_GET['filtervalue'])) {
+  if (isValid('filterType',strtolower($_GET['filtertype']))) {
+    if (isValid('filterValue',$_GET['filtervalue'],strtolower($_GET['filtertype']))) {
+      $filterType = strtolower($_GET['filtertype']);
+      $filterValue = $_GET['filtervalue'];
+    }
+  }
+}
+if (isset($_GET['title'])) {
+  if (isValid('title',strip_tags($_GET['title']))) {
+    $title = urldecode(strip_tags($_GET['title']));
+  }
+}
+
+// Get channel from GET
+if ($channelId = $_GET['channel']) {
+  if (!(ischannelId($channelId))) {
+    // this is not a valid channel ID; must be a username
+    $channelId = getChannelId($apiKey,$channelId); // returns false if this too fails
+  }
+}
+
 showTop($title,$goodColor,$badColor);
-$timeStart = microtime(true); // for benchmarking
 
 $channels = parse_ini_file('channels.ini',true);
 $numChannels = sizeof($channels);
+
+$timeStart = microtime(true); // for benchmarking
 
 // It can take a long time to collect data for all videos within a channel
 // Therefore this script only handles one channel at a time.
@@ -106,7 +159,7 @@ if ($numChannels > 0) {
     echo '<p class="error">Unable to retrieve file: ';
     echo '<a href="'.$channelQuery.'">'.$channelQuery.'</a></p>'."\n";
   }
-  showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includechannelId);
+  showResults($c,$channel,$channels,$numChannels,$metaKeys,$output,$report,$filterType,$filterValue,$includeLinks,$includeChannelId,$highlights);
 }
 else {
   echo 'There are no channels.<br/>';
@@ -121,6 +174,49 @@ if ($c < ($numChannels-1)) {
   echo '<p>Total run time: '.$time.' seconds</p>'."\n";
 }
 echo "</body>\n</html>";
+
+function isValid($var, $value, $filterType=NULL) {
+
+  // returns true if $value is a valid value of $var
+  // $filterType is included if $var == 'filterValue'
+
+  if ($var == 'filterValue') {
+    if ($filterType == 'percentile') {
+      if ($value > 0 && $value < 100) {
+        return true;
+      }
+    }
+    else {
+      if (is_int(strval($value))) {
+        return true;
+      }
+      if (is_numeric($value) && $value > 0) {
+        return true;
+      }
+    }
+  }
+  elseif ($var == 'title') {
+    // not currently any rules for title
+    // may need to add some
+    // For example, could check to see if title is properly URL-encoded
+    return true;
+  }
+  else {
+    if ($var == 'output') {
+      $allowed = array('html','xml','json');
+    }
+    elseif ($var == 'report') {
+      $allowed = array('summary','details');
+    }
+    elseif ($var == 'filterType') {
+      $allowed = array('views','percentile','count');
+    }
+    if (in_array($value,$allowed)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function fileGetContents($url) {
 
@@ -260,14 +356,14 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
   return $videos;
 }
 
-function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighlights,$goodPct,$badPct,$goodLabel,$badLabel,$includeHighTraffic,$minViews,$includeLinks,$includechannelId) {
+function showResults($c,$channel,$channels,$numChannels,$metaKeys,$output,$report,$filterType,$filterValue,$includeLinks,$includeChannelId,$highlights) {
 
   if ($numChannels > 0) {
     echo "<table>\n";
     echo "<tr>\n";
     echo '<th scope="col">ID</th>'."\n";
     echo '<th scope="col">YouTube Channel</th>'."\n";
-    if ($includechannelId) {
+    if ($includeChannelId) {
       echo '<th scope="col">YouTube ID</th>'."\n";
     }
     $numMeta = sizeof($metaKeys);
@@ -349,7 +445,7 @@ function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighli
               echo '</a>';
             }
             echo "</td>\n";
-            if ($includechannelId) {
+            if ($includeChannelId) {
               echo '<td>'.$resultsData[2]."</td>\n"; // channel id
             }
             // If channel included supplemental meta data, it was stored at end of $resultsData
@@ -466,7 +562,7 @@ function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighli
       echo '</a>';
     }
     echo "</td>\n";
-    if ($includechannelId) {
+    if ($includeChannelId) {
       echo '<td>'.$channel['id']."</td>\n";
     }
     // Display supplemental meta data, if any exists in $channels array
@@ -497,7 +593,7 @@ function showResults($c,$channel,$channels,$numChannels,$metaKeys,$includeHighli
     // add a totals row
     echo '<tr class="totals">'."\n";
     echo '<th scope="row" ';
-    if ($includechannelId) {
+    if ($includeChannelId) {
       $colSpan = 3 + $numMeta;
     }
     else {
