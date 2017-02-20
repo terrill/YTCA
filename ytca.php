@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.2
+ * version 1.0.3
  *
  */
 
@@ -16,8 +16,6 @@
 // Store API key in a local file
 
 $apiKeyFile = 'apikey'; // name of local file in which API key is stored
-
-$apiKey = file_get_content($apiKeyFile);
 
 // Title of report
 $title = 'YouTube Caption Auditor (YTCA) Report';
@@ -48,18 +46,6 @@ $includeLinks = true;
 // Set $includeChannelID to true to include a YouTube Channel ID column in the output; otherwise false
 $includeChannelID = false;
 
-// Copy and uncomment the following line for each YouTube channel. Assign 'name' and 'id' as follows:
-// 'name' - The name of the channel as you would like it to appear in the report
-// 'id' - either the 24-character YouTube Channel ID or its associated username (see README.md for more about channel IDs)
-// $channels[] = array('name'=>'Name of Channel','id'=>'channel_id');
-
-// Optionally, the $channels array can include additional keys.
-// Any keys other than 'name' and 'id' will be used as column headers in the report
-// and their values will be displayed as data for that channel in the report
-// This can be useful if there is additional known meta data that you would like to include in the report
-// Example:
-// $channels[] = array('name'=>'Bernie Sanders','id'=>'UCH1dpzjCEiGAt8CXkryhkZg','Party'=>'Democrat');
-
 /***********************
  *                     *
  *  END CONFIGURATION  *
@@ -68,9 +54,12 @@ $includeChannelID = false;
 
 error_reporting(E_ERROR | E_PARSE);
 ini_set(max_execution_time,900); // in seconds; increase if script is timing out on large channels
+$apiKey = file_get_contents($apiKeyFile);
 
 showTop($title,$goodColor,$badColor);
 $timeStart = microtime(true); // for benchmarking
+
+$channels = parse_ini_file('channels.ini',true);
 $numChannels = sizeof($channels);
 
 // It can take a long time to collect data for all videos within a channel
