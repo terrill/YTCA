@@ -15,7 +15,7 @@
 // https://developers.google.com/youtube/v3/docs/
 // Store API key in a local file
 
-$apiKeyFile = 'apikey.ini'; // file in which API key is stored
+$apiKeyFile = 'apikey'; // name of local file in which API key is stored
 
 $apiKey = file_get_content($apiKeyFile);
 
