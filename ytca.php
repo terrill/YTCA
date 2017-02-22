@@ -72,7 +72,7 @@ $highlights['badLabel'] = 'Needs work'; // title attribute on channel name for '
  ***********************/
 
 error_reporting(E_ERROR | E_PARSE);
-ini_set(max_execution_time,900); // in seconds; increase if script is timing out on large channels
+ini_set(max_execution_time,0); // in seconds; 0 = run until finished if supported by server configuration
 $apiKey = file_get_contents($apiKeyFile);
 
 // Override default variables with GET params
@@ -100,23 +100,32 @@ if (isset($_GET['title'])) {
   }
 }
 
-// Get channel from GET
-if ($channelId = $_GET['channel']) {
+// Get channel from URL (channelid and (optionally) channelname)
+// if either parameter is included in URL, that channel is audited rather than using channels.ini
+if ($channelId = $_GET['channelid']) {
   if (!(ischannelId($channelId))) {
     // this is not a valid channel ID; must be a username
     $channelId = getChannelId($apiKey,$channelId); // returns false if this too fails
   }
+  $channels[0]['id'] = $channelId;
+  if (isset($_GET['channelname'])) {
+    $channels[0]['name'] = $_GET['channelname'];
+  }
+  else { // use the id for channel name (can be replaced later with channel name from YouTube results)
+    $channels[0]['name'] = $channelId;
+  }
 }
+else {
+  // get channel(s) from ini file
+  $channels = parse_ini_file('channels.ini',true);
+}
+$numChannels = sizeof($channels);
 
 showTop($title,$goodColor,$badColor);
 
-$channels = parse_ini_file('channels.ini',true);
-$numChannels = sizeof($channels);
 
 $timeStart = microtime(true); // for benchmarking
 
-// It can take a long time to collect data for all videos within a channel
-// Therefore this script only handles one channel at a time.
 if ($numChannels > 0) {
   if (!($c = $_POST['channel'])) {
     $c = 0;
@@ -277,7 +286,7 @@ function buildYouTubeQuery($which, $id, $apiKey, $nextPageToken=NULL) {
   elseif ($which == 'channels') {
     // Cost = 5 units
     // Cheaper than search, but doesn't include individual video data (not even ids)
-    // This is currently only used for looking up channel IDs
+    // This is currently only used for looking up channel IDs or names
     $request = 'https://www.googleapis.com/youtube/v3/channels?';
     $request .= 'key='.$apiKey;
     $request .= '&forUsername='.$id;
