@@ -121,8 +121,7 @@ else {
 }
 $numChannels = sizeof($channels);
 
-showTop($title,$goodColor,$badColor);
-
+showTop($title,$highlights['goodColor'],$highlights['badColor']);
 
 $timeStart = microtime(true); // for benchmarking
 
@@ -805,72 +804,16 @@ function showTop($title,$goodColor,$badColor) {
   echo "<!DOCTYPE html>\n";
   echo "<head>\n";
   echo '<title>'.$title."</title>\n";
-  echo "<style>\n";
-  echo <<<END
-    body {
-      font-family: Arial, sans-serif;
-      font-size: 1em;
-      margin: 1em;
-    }
-    .date {
-      font-weight: bold;
-      font-size: 1.1em;
-    }
-    table {
-      background-color: black;
-    }
-    th, td {
-      background-color: white;
-      margin: 1px;
-      color: black;
-      padding: 1em;
-    }
-    th[scope="col"] {
-      vertical-align: bottom;
-    }
-    td.data {
-      text-align: right;
-    }
-    td a {
-      color: #474747;
-      text-decoration: underline;
-    }
-    tr.goodChannel th,
-    tr.goodChannel td {
-      background-color: $goodColor;
-    }
-    tr.badChannel th,
-    tr.badChannel td {
-      background-color: $badColor;
-    }
-    tr.totals td {
-      font-weight: bold;
-    }
-    input[type="submit"] {
-      margin: 1em;
-      font-size: 1em;
-      border: 1px solid #666;
-      border-radius: 5px;
-      padding: 0.15em;
-      background-color:#9F9
-    }
-    input[type="submit"]:hover,
-    input[type="submit"]:focus,
-    input[type="submit"]:active {
-      background-color: black;
-      border-color: #9F9;
-      color: white;
-    }
-    textarea {
-      display: none;
-    }
-    p.error {
-      font-weight: bold;
-    }
-    p.footnote {
-      margin-left: 2em;
-    }
-END;
+  echo '<link rel="stylesheet" type="text/css" href="ytca.css">'."\n";
+  echo '<style>'."\n";
+  echo "tr.goodChannel th,\n";
+  echo "tr.goodChannel td {\n";
+  echo "  background-color: $goodColor;\n";
+  echo "}\n";
+  echo "tr.badChannel th,\n";
+  echo "tr.badChannel td {\n";
+  echo "  background-color: $badColor;\n";
+  echo "}\n";
   echo "</style>\n";
   echo "</head>\n";
   echo "<body>\n";
