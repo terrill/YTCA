@@ -145,6 +145,11 @@ if ($numChannels > 0) {
 
   $channelMeta = getChannelMeta($channels); // return an array if metadata for each channel, else false
 
+  // prepare to write output immediately to screen (rather than wait for script to finish executing)
+  if (ob_get_level() == 0) {
+    ob_start();
+  }
+
   showTableTop($includeChannelId,$channelMeta);
 
   $c = 0;
@@ -236,6 +241,7 @@ else {
   // handle error - no channels were found
 }
 showBottom();
+ob_end_flush();
 
 function showTop($title,$goodColor,$badColor) {
 
@@ -334,6 +340,9 @@ function showTableRow($rowNum,$channelId=NULL,$channelName=NULL,$metaData=NULL,$
   echo '<td class="data">'.number_format($channelData['ccHighTraffic']['duration'])."</td>\n";
   echo "</tr>\n";
 
+  // write output immediately to screen
+  ob_flush();
+  flush();
 }
 
 function isValid($var, $value, $filterType=NULL) {
@@ -602,6 +611,10 @@ function showTableTop($includeChannelId,$metaData) {
   echo "</tr>\n";
   echo '</thead>'."\n";
   echo '<tbody>'."\n";
+
+  // write output immediatley to screen
+  ob_flush();
+  flush();
 }
 
 function showTableBottom() {
