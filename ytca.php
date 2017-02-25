@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.3
+ * version 1.0.4
  *
  */
 
@@ -64,7 +64,6 @@ $highlights['badColor'] = '#FFD7D7'; // light red
 $highlights['goodLabel'] = 'Exemplary channel'; // title attribute on channel name for 'good' channels
 $highlights['badLabel'] = 'Needs work'; // title attribute on channel name for 'bad' channels
 
-
 /***********************
  *                     *
  *  END CONFIGURATION  *
@@ -72,7 +71,7 @@ $highlights['badLabel'] = 'Needs work'; // title attribute on channel name for '
  ***********************/
 
 error_reporting(E_ERROR | E_PARSE);
-ini_set(max_execution_time,0); // in seconds; 0 = run until finished if supported by server configuration
+ini_set('max_execution_time',0); // in seconds; 0 = run until finished
 $apiKey = file_get_contents($apiKeyFile);
 
 // Override default variables with GET params
@@ -100,6 +99,8 @@ if (isset($_GET['title'])) {
   }
 }
 
+showTop($title,$highlights['goodColor'],$highlights['badColor']);
+
 // Get channel from URL (channelid and (optionally) channelname)
 // if either parameter is included in URL, that channel is audited rather than using channels.ini
 if ($channelId = $_GET['channelid']) {
@@ -121,67 +122,219 @@ else {
 }
 $numChannels = sizeof($channels);
 
-showTop($title,$highlights['goodColor'],$highlights['badColor']);
-
-$timeStart = microtime(true); // for benchmarking
-
 if ($numChannels > 0) {
-  if (!($c = $_POST['channel'])) {
-    $c = 0;
-  }
-  $channelId = $channels[$c]['id'];
-  if (!(ischannelId($channelId))) {
-    // this is not a valid channel ID; must be a username
-    $channelId = getChannelId($apiKey,$channelId);
-  }
-  $channelQuery = buildYouTubeQuery('search',$channelId,$apiKey);
-  $channel['name'] = $channels[$c]['name'];
-  $channel['id'] = $channelId;
-  $numKeys = sizeof($channels[0]);
-  if ($numKeys > 2) {
-    // there is supplemental meta data in the array
-    $keys = array_keys($channels[0]);
-    $i = 0;
-    while ($i < $numKeys) {
-      $key = $keys[$i];
-      if ($key !== 'name' && $key !== 'id') {
-        $metaKeys[] = $key;
-      }
-      $channel[$key] = $channels[$c][$key];
-      $i++;
+
+  // initialize $totals
+
+  // all videos (count and duration)
+  $totals['all']['count'] = 0;
+  $totals['all']['duration'] = 0;
+  $totals['all']['views'] = 0;
+
+  // captioned videos (count and duration)
+  $totals['cc']['count'] = 0;
+  $totals['cc']['duration'] = 0;
+
+  // high traffic videos (count and duration)
+  $totals['highTraffic']['count'] = 0;
+  $totals['highTraffic']['duration'] = 0;
+
+  // captioned high traffic videos (count and duration)
+  $totals['ccHighTraffic']['count'] = 0;
+  $totals['ccHighTraffic']['duration'] = 0;
+
+  $channelMeta = getChannelMeta($channels); // return an array if metadata for each channel, else false
+
+  showTableTop($includeChannelId,$channelMeta);
+
+  $c = 0;
+  while ($c < $numChannels) {
+
+    if (!(ischannelId($channels[$c]['id']))) {
+      // this is not a valid channel ID; must be a username
+      $channels[$c]['id'] = getChannelId($apiKey,$channels[$c]['id']);
     }
-  }
-  if ($content = fileGetContents($channelQuery)) {
-    $json = json_decode($content,true);
-    $numVideos = $json['pageInfo']['totalResults'];
-    $channel['videoCount'] = $numVideos;
-    if ($numVideos > 0) {
-      $channel['videos'] = getVideos($channelId,$json,$numVideos,$apiKey);
+    $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],$apiKey);
+
+    // create an array of metadata for this channel (if any exists)
+    $numKeys = sizeof($channels[$c]);
+    if ($numKeys > 2) {
+      // there is supplemental meta data in the array
+      $keys = array_keys($channels[$c]);
+      $i = 0;
+      while ($i < $numKeys) {
+        $key = $keys[$i];
+        if ($key !== 'name' && $key !== 'id') {
+          $metaKeys[] = $key;
+        }
+        $i++;
+      }
+    }
+
+    if ($content = fileGetContents($channelQuery)) {
+      $json = json_decode($content,true);
+      $numVideos = $json['pageInfo']['totalResults'];
+      $channel['videoCount'] = $numVideos;
+      if ($numVideos > 0) {
+        // add a 'videos' key for this channel that point to all videos
+        $channels[$c]['videos'] = getVideos($channelId,$json,$numVideos,$apiKey);
+      }
+      else {
+        // TODO: handle error: No videos returned by $channelQuery
+      }
     }
     else {
-      echo 'URL Error: '.$channelQuery."<br/>\n";
+      // TODO: handle error: Unable to retrieve file: $channelQuery
     }
-    $i++;
+
+    // perform calculations for current channel
+
+    // update $numVideos to reflect actual number of videos retrieved
+    // *should* be the same as previous value, but one never knows
+    $videos = $channels[$c]['videos'];
+    $numVideos = sizeof($videos);
+
+    // add values to channel totals
+    $channelData['all']['count'] = $numVideos;
+    $channelData['all']['duration'] = calcDuration($videos,$numVideos);
+    $channelData['all']['views'] = countViews($videos,$numVideos);
+    $channelData['cc']['count'] = countCaptioned($videos,$numVideos);
+    $channelData['cc']['duration'] = calcDuration($videos,$numVideos,'true');
+    if ($minViews > 0) { // TODO: Update this to use new filter variables
+      $highTrafficThreshold = $minViews;
+    }
+    else {
+      $highTrafficThreshold = $avgViews;
+    }
+    $channelData['highTraffic']['count'] = countHighTraffic($videos,$numVideos,$highTrafficThreshold);
+    $channelData['highTraffic']['duration'] = calcDuration($videos,$numVideos,NULL,$highTrafficThreshold);
+    $channelData['ccHighTraffic']['count'] = countCaptioned($videos,$numVideos,$highTrafficThreshold);
+    $channelData['ccHighTraffic']['duration'] = calcDuration($videos,$numVideos,'true',$highTrafficThreshold);
+
+    $rowNum = $c + 1;
+    showTableRow($rowNum,$channels[$c]['id'],$channels[$c]['name'],$channelMeta[$c],$channelData,$includeLinks,$includeChannelId,$highlights);
+
+    // increment totals with values from this channel
+    $totals['all']['count'] += $channelData['all']['count'];
+    $totals['all']['duration'] +=  $channelData['all']['duration'];
+    $totals['all']['views'] +=  $channelData['all']['views'];
+    $totals['cc']['count'] += $channelData['cc']['count'];
+    $totals['cc']['duration'] += $channelData['cc']['duration'];
+    $totals['highTraffic']['count'] += $channelData['highTraffic']['count'];
+    $totals['highTraffic']['duration'] += $channelData['highTraffic']['duration'];
+    $totals['ccHighTraffic']['count'] += $channelData['ccHighTraffic']['count'];
+    $totals['ccHighTraffic']['duration'] += $channelData['ccHighTraffic']['duration'];
+
+    $c++;
   }
-  else {
-    echo '<p class="error">Unable to retrieve file: ';
-    echo '<a href="'.$channelQuery.'">'.$channelQuery.'</a></p>'."\n";
-  }
-  showResults($c,$channel,$channels,$numChannels,$metaKeys,$output,$report,$filterType,$filterValue,$includeLinks,$includeChannelId,$highlights);
+
+  // add totals row
+  showTableRow('totals',NULL,NULL,$channelMeta[0],$totals,$includeLinks,$includeChannelId,$highlights);
+  showTableBottom();
 }
 else {
-  echo 'There are no channels.<br/>';
+  // handle error - no channels were found
+}
+showBottom();
+
+function showTop($title,$goodColor,$badColor) {
+
+  echo "<!DOCTYPE html>\n";
+  echo "<head>\n";
+  echo '<title>'.$title."</title>\n";
+  echo '<link rel="stylesheet" type="text/css" href="ytca.css">'."\n";
+  echo '<style>'."\n";
+  echo "tr.goodChannel th,\n";
+  echo "tr.goodChannel td {\n";
+  echo "  background-color: $goodColor;\n";
+  echo "}\n";
+  echo "tr.badChannel th,\n";
+  echo "tr.badChannel td {\n";
+  echo "  background-color: $badColor;\n";
+  echo "}\n";
+  echo "</style>\n";
+  echo "</head>\n";
+  echo "<body>\n";
+  echo '<h1>'.$title."</h1>\n";
+  echo '<p class="date">'.date('M d, Y')."</p>\n";
+  echo '<div id="status"></div>'."\n";
 }
 
-// end benchmark and report result
-$timeEnd = microtime(true);
-$time = $timeEnd - $timeStart;
-if ($c < ($numChannels-1)) {
-  // run time is only meaningful per channel.
-  // Don't show this in the final report.
-  echo '<p>Total run time: '.$time.' seconds</p>'."\n";
+function showTableRow($rowNum,$channelId=NULL,$channelName=NULL,$metaData=NULL,$channelData,$includeLinks,$includeChannelId,$highlights) {
+
+  // $rowNum is either an integer, or 'totals'
+
+  // calculate percentages and averages
+  $pctCaptioned = round($channelData['cc']['count']/$channelData['all']['count'] * 100,1);
+  $pctCaptionedHighTraffic = round($channelData['ccHighTraffic']['count']/$channelData['highTraffic']['count'] * 100,1);
+  $avgViews = round($channelData['all']['views']/$channelData['all']['count']); // an integer, don't need precision
+
+  echo '<tr';
+  $numMeta = sizeof($metaData);
+  if ($rowNum == 'totals') {
+    echo ' class="totals">';
+    // calculate colspan for Totals row header
+    // always span ID and Name columns
+    if ($includeChannelId) { // span that too, plus all metadata columns
+      $colSpan = $numMeta + 3;
+    }
+    else { // span all metadata columns
+      $colSpan = $numMeta + 2;
+    }
+    echo '<th scope="row" colspan="'.$colSpan.'">TOTALS</th>'."\n";
+  }
+  else {
+    if ($highlights['use']) {
+      if ($pctCaptioned >= $highlights['goodPct']) {
+        echo ' class="goodChannel">'."\n";
+        $channelTitle = ' title="'.$highlights['goodLabel'].'"';
+      }
+      elseif ($pctCaptioned <= $highlights['badPct']) {
+        echo ' class="badChannel">'."\n";
+        $channelTitle = ' title="'.$highlights['badLabel'].'"';
+      }
+      else {
+        echo '>'."\n";
+        $channelTitle = NULL;
+      }
+    }
+    else {
+      echo '>'."\n";
+      $channelTitle = NULL;
+    }
+    echo '<td>'.$rowNum."</td>\n";
+    echo '<th scope="row">';
+    if ($includeLinks) {
+      echo '<a href="https://www.youtube.com/channel/'.$channelId.'">';
+    }
+    echo $channelName;
+    if ($includeLinks) {
+      echo '</a>';
+    }
+    echo "</th>\n";
+    if ($includeChannelId) {
+      echo '<td>'.$channelId."</td>\n";
+    }
+    // Display supplemental meta data, if any exists
+    if ($metaData) {
+      foreach ($metaData as $key => $value) {
+        echo '<td>'.$value."</td>\n";
+      }
+    }
+  } // end if not totals row
+  echo '<td class="data">'.number_format($channelData['all']['count'])."</td>\n";
+  echo '<td class="data">'.number_format($channelData['all']['duration'])."</td>\n";
+  echo '<td class="data">'.number_format($channelData['cc']['count'])."</td>\n";
+  echo '<td class="data">'.number_format($pctCaptioned,1)."%</td>\n";
+  echo '<td class="data">'.number_format($avgViews)."</td>\n";
+  echo '<td class="data">'.number_format($channelData['highTraffic']['count'])."</td>\n";
+  echo '<td class="data">'.number_format($channelData['ccHighTraffic']['count'])."</td>\n";
+  echo '<td class="data">'.number_format($pctCaptionedHighTraffic,1)."%</td>\n";
+  echo '<td class="data">'.number_format($channelData['cc']['duration'])."</td>\n";
+  echo '<td class="data">'.number_format($channelData['ccHighTraffic']['duration'])."</td>\n";
+  echo "</tr>\n";
+
 }
-echo "</body>\n</html>";
 
 function isValid($var, $value, $filterType=NULL) {
 
@@ -262,6 +415,54 @@ function isChannelId($string) {
     }
   }
   return false;
+}
+
+function getChannelMeta($channels) {
+
+  // if any channel in the array has more than 2 keys
+  // the extra keys are metadata that will be applied uninformly to all channels
+  // (those with no matching metadata will just having missing data)
+
+  // first, retrieve all metadata keys
+  $i=0;
+  while ($i < sizeof($channels)) {
+    $keys = array_keys($channels[$i]);
+    $numKeys = sizeof($keys);
+    if ($numKeys > 2) {
+      // this channel has meta keys
+      $j=0;
+      while ($j < $numKeys) {
+        $key = $keys[$j];
+        if ($key !== 'name' && $key !== 'id') {
+          if (!in_array($key, $metaKeys)) {
+            // this is a new key, not yet added to array
+            $metaKeys[] = $key;
+          }
+        }
+        $j++;
+      }
+    }
+    $i++;
+  }
+  // second, if metadata keys were found,
+  // build an array of each channel's data for each key
+  $numMeta = sizeof($metaKeys);
+  if ($numMeta > 0) {
+    $i=0;
+    while ($i < sizeof($channels)) {
+      $j=0;
+      while ($j < $numMeta) {
+        $key = $metaKeys[$j];
+        $metaData[$i][$key] = $channels[$i][$key];
+        $j++;
+      }
+      $i++;
+    }
+    return $metaData;
+  }
+  else {
+    return false;
+  }
 }
 
 function buildYouTubeQuery($which, $id, $apiKey, $nextPageToken=NULL) {
@@ -352,7 +553,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
       if ($videoContent = fileGetContents($videoQuery)) {
         $videos[$v]['status'] = 'Success!'; // added for debugging purposes
         $videoJson = json_decode($videoContent,true);
-        $videos[$v]['duration'] = $videoJson['items'][0]['contentDetails']['duration'];
+        $videos[$v]['duration'] = $videoJson['items'][0]['contentDetails']['duration']; // in seconds
         $videos[$v]['captions'] = $videoJson['items'][0]['contentDetails']['caption']; // 'true' or 'false'
         $videos[$v]['views'] = $videoJson['items'][0]['statistics']['viewCount'];
       }
@@ -364,330 +565,55 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
   return $videos;
 }
 
-function showResults($c,$channel,$channels,$numChannels,$metaKeys,$output,$report,$filterType,$filterValue,$includeLinks,$includeChannelId,$highlights) {
 
-  if ($numChannels > 0) {
-    echo "<table>\n";
-    echo "<tr>\n";
-    echo '<th scope="col">ID</th>'."\n";
-    echo '<th scope="col">YouTube Channel</th>'."\n";
-    if ($includeChannelId) {
-      echo '<th scope="col">YouTube ID</th>'."\n";
-    }
+function showTableTop($includeChannelId,$metaData) {
+
+  // $metaData is an array of 'keys' and 'values' for each channel; or false
+
+  echo '<table>'."\n";
+  echo '<thead>'."\n";
+  echo '<tr>'."\n";
+  echo '<th scope="col">ID</th>'."\n";
+  echo '<th scope="col">YouTube Channel</th>'."\n";
+  if ($includeChannelId) {
+    echo '<th scope="col">YouTube ID</th>'."\n";
+  }
+  if ($metaData) {
+    $metaKeys = array_keys($metaData[0]); // get keys from first channel in array
     $numMeta = sizeof($metaKeys);
-    if ($numMeta > 0) {
-      // there is supplemental meta data in the array
-      // display a column header for each meta data key
-      $i = 0;
-      while ($i < $numMeta) {
-        echo '<th scope="col">'.$metaKeys[$i]."</th>\n";
-        $i++;
-      }
-    }
-    echo '<th scope="col"># Videos</th>'."\n";
-    echo '<th scope="col">Duration</th>'."\n";
-    echo '<th scope="col"># Captioned</th>'."\n";
-    echo '<th scope="col">% Captioned</th>'."\n";
-    echo '<th scope="col">Mean # Views per Video</th>'."\n";
-    if ($includeHighTraffic) {
-      echo '<th scope="col"># Videos High Traffic</th>'."\n";
-      echo '<th scope="col"># Captioned High Traffic</th>'."\n";
-      echo '<th scope="col">% Captioned High Traffic</th>'."\n";
-    }
-    echo '<th scope="col">Duration Uncaptioned</th>'."\n";
-    if ($includeHighTraffic) {
-      echo '<th scope="col">Duration Uncaptioned High Traffic</th>'."\n";
-    }
-    echo "</tr>\n";
-    if ($resultsField = $_POST['results']) {
-      // this is not the first channel processed
-      // $results contains all previous data as comma-delimited text
-      $results = explode("\n",$resultsField);
-      $numResults = sizeof($results);
-      if ($numResults > 0) {
-        // populate table with previous results
-        $i=0;
-        $totalVideos = 0;
-        $totalDuration = 0;
-        $totalCaptioned = 0;
-        $totalDurationUncaptioned = 0;
-        if ($includeHighTraffic) {
-          $totalVideosHighTraffic = 0;
-          $totalCaptionedHighTraffic = 0;
-          $totalDurationUncaptionedHighTraffic = 0;
-        }
-
-        while ($i < $numResults) {
-          if (strlen($results[$i])>0) {
-            $resultsData = str_getcsv($results[$i]);
-            echo '<tr';
-            if ($includeHighlights) {
-              if ($resultsData[6] >= $goodPct) {
-                echo ' class="goodChannel">'."\n";
-                $channelTitle = ' title="'.$goodLabel.'"';
-              }
-              elseif ($resultsData[6] <= $badPct) {
-                echo ' class="badChannel">'."\n";
-                $channelTitle = ' title="'.$badLabel.'"';
-              }
-              else {
-                echo '>'."\n";
-                $channelTitle = NULL;
-              }
-            }
-            else {
-              echo '>'."\n";
-              $channelTitle = NULL;
-            }
-            echo '<td>'.$resultsData[0]."</td>\n"; // column number
-            echo '<td';
-            if ($channelTitle) {
-              echo $channelTitle;
-            }
-            echo '>';
-            if ($includeLinks) {
-              echo '<a href="https://www.youtube.com/channel/'.$resultsData[2].'">'; // channel name
-            }
-            echo $resultsData[1];
-            if ($includeLinks) {
-              echo '</a>';
-            }
-            echo "</td>\n";
-            if ($includeChannelId) {
-              echo '<td>'.$resultsData[2]."</td>\n"; // channel id
-            }
-            // If channel included supplemental meta data, it was stored at end of $resultsData
-            if ($numMeta) {
-              if ($includeHighTraffic) {
-                $metaIndex = 13;
-              }
-              else {
-                $metaIndex = 9;
-              }
-              $j = 0;
-              while ($j < $numMeta) {
-                echo '<td>'.$resultsData[$metaIndex]."</td>\n";
-                $metaIndex++;
-                $j++;
-              }
-            }
-            echo '<td class="data">'.number_format($resultsData[3])."</td>\n"; // number of videos
-            $totalVideos += $resultsData[3];
-            echo '<td class="data">'.number_format($resultsData[4])."</td>\n"; // duration
-            $totalDuration += $resultsData[4];
-            echo '<td class="data">'.number_format($resultsData[5])."</td>\n"; // number captioned
-            $totalCaptioned += $resultsData[5];
-            echo '<td class="data">'.number_format($resultsData[6],1)."%</td>\n"; // percent captioned
-            echo '<td class="data">'.number_format($resultsData[7])."</td>\n"; // mean # of views
-            if ($includeHighTraffic) {
-              echo '<td class="data">'.number_format($resultsData[8])."</td>\n"; // # videos high traffic
-              $totalVideosHighTraffic += $resultsData[8];
-              echo '<td class="data">'.number_format($resultsData[9])."</td>\n"; // # captioned high traffic
-              $totalCaptionedHighTraffic += $resultsData[9];
-              echo '<td class="data">'.number_format($resultsData[10],1)."%</td>\n"; // % captioned high traffic
-              echo '<td class="data">'.number_format($resultsData[11])."</td>\n"; // duration uncaptioned
-              $totalDurationUncaptioned += $resultsData[11];
-              echo '<td class="data">'.number_format($resultsData[12])."</td>\n"; // duration uncaptioned high traffic
-              $totalDurationUncaptionedHighTraffic += $resultsData[12];
-            }
-            else {
-              echo '<td class="data">'.number_format($resultsData[8])."</td>\n"; // duration uncaptioned
-              $totalDurationUncaptioned += $resultsData[8];
-            }
-            echo "</tr>\n";
-          }
-          $i++;
-        }
-      }
-    }
-    // perform calculations for current channel
-    $videos = $channel['videos'];
-    $numVideos = sizeof($videos);
-    $totalVideos += $numVideos;
-    $duration = calcDuration($videos,$numVideos);
-    $totalDuration += $duration;
-    $numCaptioned = countCaptioned($videos,$numVideos);
-    $totalCaptioned += $numCaptioned;
-    $pctCaptioned = round($numCaptioned/$numVideos * 100,1);
-    $durationUncaptioned = calcDuration($videos,$numVideos,'false');
-    $totalDurationUncaptioned += $durationUncaptioned;
-    if ($includeHighTraffic) {
-      $totalDurationUncaptionedHighTraffic += $durationUncaptionedHighTraffic;
-    }
-    $avgViews = calcAvgViews($videos,$numVideos); // returns an integer (don't need high precision)
-    if ($includeHighTraffic) {
-      if ($minViews > 0) {
-        $highTrafficThreshold = $minViews;
-      }
-      else {
-        $highTrafficThreshold = $avgViews;
-      }
-      $numVideosHighTraffic = countHighTraffic($videos,$numVideos,$highTrafficThreshold);
-      $totalVideosHighTraffic += $numVideosHighTraffic;
-      $numCaptionedHighTraffic = countCaptioned($videos,$numVideos,$highTrafficThreshold);
-      $totalCaptionedHighTraffic += $numCaptionedHighTraffic;
-      $pctCaptionedHighTraffic = round($numCaptionedHighTraffic/$numVideosHighTraffic * 100,1);
-      $durationUncaptionedHighTraffic = calcDuration($videos,$numVideos,'false',$highTrafficThreshold);
-      $totalDurationUncaptionedHighTraffic += $durationUncaptionedHighTraffic;
-    }
-
-    // add current channel's data to the table
-    echo '<tr';
-    if ($includeHighlights) {
-      if ($pctCaptioned >= $goodPct) {
-        echo ' class="goodChannel">'."\n";
-        $channelTitle = ' title="'.$goodLabel.'"';
-      }
-      elseif ($pctCaptioned <= $badPct) {
-        echo ' class="badChannel">'."\n";
-        $channelTitle = ' title="'.$badLabel.'"';
-      }
-      else {
-        echo '>'."\n";
-        $channelTitle = NULL;
-      }
-    }
-    else {
-      echo '>'."\n";
-      $channelTitle = NULL;
-    }
-    if ($numResults) {
-      echo '<td>'.$numResults."</td>\n";
-    }
-    else { // this is the first channel
-      echo '<td>1</td>'."\n";
-    }
-    echo '<td';
-    if ($channelTitle) {
-      echo $channelTitle;
-    }
-    echo '>';
-    if ($includeLinks) {
-      echo '<a href="https://www.youtube.com/channel/'.$channel['id'].'">';
-    }
-    echo $channel['name'];
-    if ($includeLinks) {
-      echo '</a>';
-    }
-    echo "</td>\n";
-    if ($includeChannelId) {
-      echo '<td>'.$channel['id']."</td>\n";
-    }
-    // Display supplemental meta data, if any exists in $channels array
-    if ($numMeta) {
-      $i = 0;
-      while ($i < $numMeta) {
-        $key = $metaKeys[$i];
-        echo '<td>'.$channel[$key].'</td>'."\n";
-        $i++;
-      }
-    }
-    echo '<td class="data">'.number_format($numVideos)."</td>\n";
-    echo '<td class="data">'.number_format($duration)."</td>\n";
-    echo '<td class="data">'.number_format($numCaptioned)."</td>\n";
-    echo '<td class="data">'.$pctCaptioned."%</td>\n";
-    echo '<td class="data">'.number_format($avgViews)."</td>\n";
-    if ($includeHighTraffic) {
-      echo '<td class="data">'.number_format($numVideosHighTraffic)."</td>\n";
-      echo '<td class="data">'.number_format($numCaptionedHighTraffic)."</td>\n";
-      echo '<td class="data">'.number_format($pctCaptionedHighTraffic,1)."%</td>\n";
-    }
-    echo '<td class="data">'.number_format($durationUncaptioned)."</td>\n";
-    if ($includeHighTraffic) {
-      echo '<td class="data">'.number_format($durationUncaptionedHighTraffic)."</td>\n";
-    }
-    echo "</tr>\n";
-
-    // add a totals row
-    echo '<tr class="totals">'."\n";
-    echo '<th scope="row" ';
-    if ($includeChannelId) {
-      $colSpan = 3 + $numMeta;
-    }
-    else {
-      $colSpan = 2 + $numMeta;
-    }
-    echo 'colspan="'.$colSpan.'">TOTALS</th>'."\n";
-    echo '<td class="data">'.number_format($totalVideos)."</td>\n";
-    echo '<td class="data">'.number_format($totalDuration)."</td>\n";
-    echo '<td class="data">'.number_format($totalCaptioned)."</td>\n";
-    $totalPctCaptioned = round($totalCaptioned/$totalVideos * 100,1);
-    echo '<td class="data">'.$totalPctCaptioned."%</td>\n";
-    echo '<td class="data">--</td>'."\n"; // avg is only calculated per channel; no "total avg" needed
-    if ($includeHighTraffic) {
-      echo '<td class="data">'.number_format($totalVideosHighTraffic)."</td>\n";
-      echo '<td class="data">'.number_format($totalCaptionedHighTraffic)."</td>\n";
-      $totalPctCaptionedHighTraffic = round($totalCaptionedHighTraffic/$totalVideosHighTraffic * 100,1);
-      echo '<td class="data">'.$totalPctCaptionedHighTraffic."%</td>\n";
-    }
-    echo '<td class="data">'.number_format($totalDurationUncaptioned)."</td>\n";
-    if ($includeHighTraffic) {
-      echo '<td class="data">'.number_format($totalDurationUncaptionedHighTraffic)."</td>\n";
-    }
-    echo "</tr>\n";
-    echo "</table>\n";
-
-    if ($includeHighTraffic) {
-      echo '<p class="footnote">&quot;<em>High traffic</em>&quot; = greater than ';
-      if ($minViews > 0) {
-        echo $minViews.' views</p>'."\n";
-      }
-      else {
-        echo 'the mean number of views for this channel</p>'."\n";
-      }
-    }
-
-    if ($c < ($numChannels - 1)) {
-      // this is not the last channel
-      // append result to the cumulative results field
-      echo '<form action="#" method="POST">'."\n";
-      echo '<textarea name="results">'."\n";
-      echo $resultsField; // data from previous post
-      $rowNum = $c + 1;
-      echo $rowNum.',';
-      echo '"'.addslashes($channel['name']).'",';
-      echo '"'.addslashes($channel['id']).'",';
-      echo $numVideos.',';
-      echo $duration.',';
-      echo $numCaptioned.',';
-      echo $pctCaptioned.',';
-      echo $avgViews.',';
-      if ($includeHighTraffic) {
-        echo $numVideosHighTraffic.',';
-        echo $numCaptionedHighTraffic.',';
-        echo $pctCaptionedHighTraffic.',';
-      }
-      echo $durationUncaptioned;
-      if ($includeHighTraffic) {
-        echo ','.$durationUncaptionedHighTraffic;
-      }
-      // Add supplemental meta data to end, since the number of fields is unknown
-      // (makes for easier retrieval)
-      if ($numMeta) {
-        $i = 0;
-        while ($i < $numMeta) {
-          echo ',';
-          $key = $metaKeys[$i];
-          echo '"'.$channel[$key].'"';
-          $i++;
-        }
-      }
-      echo "\n</textarea>\n";
-
-      $nextIndex = $c+1;
-      $nextColNum = $nextIndex+1;
-      $nextChannel = 'Proceed to Channel '.$nextColNum.' of '.$numChannels.' (';
-      $nextChannel .= $channels[$nextIndex]['name'].')';
-      echo '<input type="hidden" name="channel" value="'.$nextIndex.'">'."\n";
-
-      echo '<input type="submit" value="'.$nextChannel.'">'."\n";
-      echo "</form>\n";
-    }
-    else {
-      // this *is* the last channel!
-      // could display a Success! message
+    // there is supplemental meta data
+    // display a column header for each metaData key
+    $i = 0;
+    while ($i < $numMeta) {
+      echo '<th scope="col">'.$metaKeys[$i]."</th>\n";
+      $i++;
     }
   }
+  echo '<th scope="col"># Videos</th>'."\n";
+  echo '<th scope="col">Duration</th>'."\n";
+  echo '<th scope="col"># Captioned</th>'."\n";
+  echo '<th scope="col">% Captioned</th>'."\n";
+  echo '<th scope="col">Mean # Views per Video</th>'."\n";
+  echo '<th scope="col"># Videos High Traffic</th>'."\n";
+  echo '<th scope="col"># Captioned High Traffic</th>'."\n";
+  echo '<th scope="col">% Captioned High Traffic</th>'."\n";
+  echo '<th scope="col">Duration Captioned</th>'."\n";
+  echo '<th scope="col">Duration Captioned High Traffic</th>'."\n";
+  echo "</tr>\n";
+  echo '</thead>'."\n";
+  echo '<tbody>'."\n";
+}
+
+function showTableBottom() {
+
+  echo "</tbody>\n";
+  echo "</table>\n";
+}
+
+function showBottom() {
+
+  echo "</body>\n";
+  echo "</html>";
 }
 
 function calcDuration($videos,$numVideos,$captioned=NULL,$viewThreshold=NULL) {
@@ -741,22 +667,21 @@ function calcDuration($videos,$numVideos,$captioned=NULL,$viewThreshold=NULL) {
   return $seconds;
 }
 
-function calcAvgViews($videos,$numVideos) {
+function countViews($videos,$numVideos) {
 
-  // returns average number of views per video
+  // returns total number of views for all $videos
   $i=0;
   $totalViews=0;
   while ($i < $numVideos) {
     $totalViews += $videos[$i]['views'];
     $i++;
   }
-  return round($totalViews/$numVideos);
+  return $totalViews;
 }
 
 function countHighTraffic ($videos,$numVideos,$threshold) {
 
-  // returns average number of views per video
-  // $threshold is the number of views above which a video is considered "high traffic"
+  // returns number of videos with traffic above $threshold (i.e., "high traffic")
   $i=0;
   $count=0;
   while ($i < $numVideos) {
@@ -797,28 +722,6 @@ function countCaptioned($videos,$numVideos,$viewThreshold=NULL) {
     $i++;
   }
   return $c;
-}
-
-function showTop($title,$goodColor,$badColor) {
-
-  echo "<!DOCTYPE html>\n";
-  echo "<head>\n";
-  echo '<title>'.$title."</title>\n";
-  echo '<link rel="stylesheet" type="text/css" href="ytca.css">'."\n";
-  echo '<style>'."\n";
-  echo "tr.goodChannel th,\n";
-  echo "tr.goodChannel td {\n";
-  echo "  background-color: $goodColor;\n";
-  echo "}\n";
-  echo "tr.badChannel th,\n";
-  echo "tr.badChannel td {\n";
-  echo "  background-color: $badColor;\n";
-  echo "}\n";
-  echo "</style>\n";
-  echo "</head>\n";
-  echo "<body>\n";
-  echo '<h1>'.$title."</h1>\n";
-  echo '<p class="date">'.date('M d, Y')."</p>\n";
 }
 
 function showArray($array) {
