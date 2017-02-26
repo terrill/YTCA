@@ -75,6 +75,10 @@ $highlights['badLabel'] = 'Needs work'; // title attribute on channel name for '
 
 error_reporting(E_ERROR | E_PARSE);
 ini_set('max_execution_time',0); // in seconds; 0 = run until finished
+
+// calculate time of execution
+$timeStart = microtime(true);
+
 $apiKey = file_get_contents($apiKeyFile);
 
 // Override default variables with GET params
@@ -107,7 +111,6 @@ if (isset($_GET['channels'])) {
   }
 }
 
-
 showTop($title,$highlights['goodColor'],$highlights['badColor']);
 
 // Get channel from URL (channelid and (optionally) channelname)
@@ -127,7 +130,7 @@ if ($channelId = $_GET['channelid']) {
 }
 else {
   // get channel(s) from ini file
-  $channels = parse_ini_file($channelsFile,true);
+  $channels = parse_ini_file($channelsFile,true); // TODO: Handle syntax errors in .ini file
 }
 $numChannels = sizeof($channels);
 
@@ -262,6 +265,12 @@ else {
   // handle error - no channels were found
 }
 showBottom();
+
+// stop calculating time of execution and display results
+$timeEnd = microtime(true);
+$time = round($timeEnd - $timeStart,2); // in seconds
+echo '<p class="runTime">Total run time: '.makeTimeReadable($time).'</p>'."\n";
+
 ob_end_flush();
 
 function showTop($title,$goodColor,$badColor) {
@@ -773,6 +782,30 @@ function convertToSeconds($duration) {
   // for videos >= 1 hour: "PT#H#M#S"
   $interval = new DateInterval($duration);
   return ($interval->h*3600)+($interval->i*60)+($interval->s);
+}
+
+function makeTimeReadable($seconds) {
+
+  $hours = floor($seconds / 3600);
+  $minutes = floor(($seconds / 60) % 60);
+  $seconds = $seconds % 60;
+  $time = '';
+  if ($hours) {
+    $time .= $hours.' hour';
+    if ($hours > 1) {
+      $time .= 's';
+    }
+    $time .= ', ';
+  }
+  if ($minutes) {
+    $time .= $minutes.' minute';
+    if ($minutes > 1) {
+      $time .= 's';
+    }
+    $time .= ', ';
+  }
+  $time .= $seconds.' seconds';
+  return $time; // I've had enough of it!
 }
 
 function countCaptioned($videos,$numVideos,$viewThreshold=NULL) {

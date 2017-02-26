@@ -59,6 +59,10 @@ p.error {
 p.footnote {
   margin-left: 2em;
 }
+p.runTime {
+  margin: 1em;
+  font-weight: bold;
+}
 div#status {
   display: none;
 	border: 2px solid orange;
