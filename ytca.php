@@ -96,11 +96,12 @@ if (isset($_GET['report'])) {
     $report = strtolower($_GET['report']);
   }
 }
+$filter = false;
 if (isset($_GET['filtertype']) && isset($_GET['filtervalue'])) {
   if (isValid('filterType',strtolower($_GET['filtertype']))) {
     if (isValid('filterValue',$_GET['filtervalue'],strtolower($_GET['filtertype']))) {
-      $filterType = strtolower($_GET['filtertype']);
-      $filterValue = $_GET['filtervalue'];
+      $filter['type'] = strtolower($_GET['filtertype']);
+      $filter['value'] = $_GET['filtervalue'];
     }
   }
 }
@@ -120,7 +121,7 @@ if (isset($_GET['channels'])) {
   }
 }
 
-showTop($title,$highlights['goodColor'],$highlights['badColor']);
+showTop($title,$highlights['goodColor'],$highlights['badColor'],$filter);
 
 // Get channel from URL (channelid and (optionally) channelname)
 // if either parameter is included in URL, that channel is audited rather than using channels.ini
@@ -157,13 +158,17 @@ if ($numChannels > 0) {
   $totals['cc']['count'] = 0;
   $totals['cc']['duration'] = 0;
 
-  // high traffic videos (count and duration)
-  $totals['highTraffic']['count'] = 0;
-  $totals['highTraffic']['duration'] = 0;
+  if (!$filter) {
+    // no reason to separate out high traffic videos if already filtering for high traffic
 
-  // captioned high traffic videos (count and duration)
-  $totals['ccHighTraffic']['count'] = 0;
-  $totals['ccHighTraffic']['duration'] = 0;
+    // high traffic videos (count and duration)
+    $totals['highTraffic']['count'] = 0;
+    $totals['highTraffic']['duration'] = 0;
+
+    // captioned high traffic videos (count and duration)
+    $totals['ccHighTraffic']['count'] = 0;
+    $totals['ccHighTraffic']['duration'] = 0;
+  }
 
   $channelMeta = getChannelMeta($channels); // return an array if metadata for each channel, else false
 
@@ -181,7 +186,7 @@ if ($numChannels > 0) {
     }
     if ($c == 0) {
       $firstChannelName = $channels[0]['name'];
-      showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit);
+      showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit,$filter);
     }
     $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],$apiKey);
 
@@ -216,11 +221,12 @@ if ($numChannels > 0) {
       // TODO: handle error: Unable to retrieve file: $channelQuery
     }
 
-    // perform calculations for current channel
-
-    // update $numVideos to reflect actual number of videos retrieved
-    // *should* be the same as previous value, but one never knows
-    $videos = $channels[$c]['videos'];
+    if ($filter) {
+      $videos = applyFilter($channels[$c]['videos'],$filter);
+    }
+    else {
+      $videos = $channels[$c]['videos'];
+    }
     $numVideos = sizeof($videos);
 
     // add values to channel totals
@@ -247,7 +253,7 @@ if ($numChannels > 0) {
       $nextChannelName = $channels[$rowNum]['name'];
     }
 
-    showTableRow($rowNum,$numChannels,$channels[$c]['id'],$channels[$c]['name'],$nextChannelName,$channelMeta[$c],$channelData,$timeUnit,$includeLinks,$includeChannelId,$highlights);
+    showTableRow($rowNum,$numChannels,$channels[$c]['id'],$channels[$c]['name'],$nextChannelName,$channelMeta[$c],$channelData,$timeUnit,$includeLinks,$includeChannelId,$filter,$highlights);
 
     // increment totals with values from this channel
     $totals['all']['count'] += $channelData['all']['count'];
@@ -258,16 +264,18 @@ if ($numChannels > 0) {
     }
     $totals['cc']['count'] += $channelData['cc']['count'];
     $totals['cc']['duration'] += $channelData['cc']['duration'];
-    $totals['highTraffic']['count'] += $channelData['highTraffic']['count'];
-    $totals['highTraffic']['duration'] += $channelData['highTraffic']['duration'];
-    $totals['ccHighTraffic']['count'] += $channelData['ccHighTraffic']['count'];
-    $totals['ccHighTraffic']['duration'] += $channelData['ccHighTraffic']['duration'];
-
+    if (!$filter) {
+      // no reason to separate out high traffic videos if already filtering for high traffic
+      $totals['highTraffic']['count'] += $channelData['highTraffic']['count'];
+      $totals['highTraffic']['duration'] += $channelData['highTraffic']['duration'];
+      $totals['ccHighTraffic']['count'] += $channelData['ccHighTraffic']['count'];
+      $totals['ccHighTraffic']['duration'] += $channelData['ccHighTraffic']['duration'];
+    }
     $c++;
   }
 
   // add totals row
-  showTableRow('totals',$numChannels,NULL,NULL,NULL,$channelMeta[0],$totals,$timeUnit,$includeLinks,$includeChannelId,$highlights);
+  showTableRow('totals',$numChannels,NULL,NULL,NULL,$channelMeta[0],$totals,$timeUnit,$includeLinks,$includeChannelId,$filter);
   showTableBottom();
 }
 else {
@@ -282,7 +290,7 @@ echo '<p class="runTime">Total run time: '.makeTimeReadable($time).'</p>'."\n";
 
 ob_end_flush();
 
-function showTop($title,$goodColor,$badColor) {
+function showTop($title,$goodColor,$badColor,$filter=NULL) {
 
   echo "<!DOCTYPE html>\n";
   echo "<head>\n";
@@ -304,9 +312,26 @@ function showTop($title,$goodColor,$badColor) {
   echo '<p class="date">'.date('M d, Y')."</p>\n";
   echo '<div id="status" role="alert"></div>'."\n";
   echo '<script src="ytca.js"></script>'."\n";
+  if ($filter) {
+    echo '<p class="filterSettings">';
+    echo 'Filter on. Including only ';
+    if ($filter['type'] == 'views') {
+      echo 'videos with <span class="filterValue">'.$filter['value'].'</span> views.';
+    }
+    elseif ($filter['type'] == 'percentile') {
+      echo 'videos in the <span class="filterValue">';
+      echo $filter['value'].getOrdinalSuffix($filter['value']);
+      echo '</span> percentile for each channel.';
+    }
+    elseif ($filter['type'] == 'count') {
+      echo 'the top <span class="filterValue">'.$filter['value'].'</span> videos in each channel ';
+      echo '(based on views)';
+    }
+    echo "</p>\n";
+  }
 }
 
-function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit) {
+function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit,$filter) {
 
   // $metaData is an array of 'keys' and 'values' for each channel; or false
 
@@ -342,10 +367,13 @@ function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChanne
   echo '<th scope="col"># '.ucfirst($timeUnit).' Captioned</th>'."\n";
   echo '<th scope="col">Mean Views per Video</th>'."\n";
   echo '<th scope="col">Max Views</th>'."\n";
-  echo '<th scope="col"># Videos High Traffic</th>'."\n";
-  echo '<th scope="col"># Captioned High Traffic</th>'."\n";
-  echo '<th scope="col">% Captioned High Traffic</th>'."\n";
-  echo '<th scope="col"># '.ucfirst($timeUnit).' Captioned High Traffic</th>'."\n";
+  if (!$filter) {
+    // no reason to separate out high traffic videos if already filtering for high traffic
+    echo '<th scope="col"># Videos High Traffic</th>'."\n";
+    echo '<th scope="col"># Captioned High Traffic</th>'."\n";
+    echo '<th scope="col">% Captioned High Traffic</th>'."\n";
+    echo '<th scope="col"># '.ucfirst($timeUnit).' Captioned High Traffic</th>'."\n";
+  }
   echo "</tr>\n";
   echo '</thead>'."\n";
   echo '<tbody>'."\n";
@@ -355,14 +383,17 @@ function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChanne
   flush();
 }
 
-function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$nextChannelName=NULL,$metaData=NULL,$channelData,$timeUnit,$includeLinks,$includeChannelId,$highlights) {
+function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$nextChannelName=NULL,$metaData=NULL,$channelData,$timeUnit,$includeLinks,$includeChannelId,$filter=NULL,$highlights=NULL) {
 
   // $rowNum is either an integer, or 'totals'
 
   // calculate percentages and averages
   $pctCaptioned = round($channelData['cc']['count']/$channelData['all']['count'] * 100,1);
-  $pctCaptionedHighTraffic = round($channelData['ccHighTraffic']['count']/$channelData['highTraffic']['count'] * 100,1);
   $avgViews = round($channelData['all']['views']/$channelData['all']['count']); // an integer, don't need precision
+  if (!$filter) {
+    // high traffic data is only included for non-filtered channels
+    $pctCaptionedHighTraffic = round($channelData['ccHighTraffic']['count']/$channelData['highTraffic']['count'] * 100,1);
+  }
 
   echo '<tr ';
 
@@ -448,10 +479,13 @@ function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$ne
   echo '<td class="data">'.formatDuration($channelData['cc']['duration'],$timeUnit)."</td>\n";
   echo '<td class="data">'.number_format($avgViews)."</td>\n";
   echo '<td class="data">'.number_format($channelData['all']['maxViews'])."</td>\n";
-  echo '<td class="data">'.number_format($channelData['highTraffic']['count'])."</td>\n";
-  echo '<td class="data">'.number_format($channelData['ccHighTraffic']['count'])."</td>\n";
-  echo '<td class="data">'.number_format($pctCaptionedHighTraffic,1)."%</td>\n";
-  echo '<td class="data">'.formatDuration($channelData['ccHighTraffic']['duration'],$timeUnit)."</td>\n";
+  if (!$filter) {
+    // high traffic data is only included for non-filtered channels
+    echo '<td class="data">'.number_format($channelData['highTraffic']['count'])."</td>\n";
+    echo '<td class="data">'.number_format($channelData['ccHighTraffic']['count'])."</td>\n";
+    echo '<td class="data">'.number_format($pctCaptionedHighTraffic,1)."%</td>\n";
+    echo '<td class="data">'.formatDuration($channelData['ccHighTraffic']['duration'],$timeUnit)."</td>\n";
+  }
   echo "</tr>\n";
 
   // write output immediately to screen
@@ -463,6 +497,12 @@ function showTableBottom() {
 
   echo "</tbody>\n";
   echo "</table>\n";
+}
+
+function showBottom() {
+
+  echo "</body>\n";
+  echo "</html>";
 }
 
 function isValid($var, $value, $filterType=NULL) {
@@ -673,13 +713,13 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
       }
     }
 
-    // now step through each item in the search query results, collecting data about each
+    // now step through each item in the search query results, collecting data about each video
     $i=0;
     while ($i < $finalIndex) {
       $videoId = $json['items'][$i]['id']['videoId'];
       $videos[$v]['id'] = $videoId;
       $videos[$v]['title'] = $json['items'][$i]['snippet']['title'];
-      // now get additional data about this video via a 'videos' query
+      // get details about this video via a 'videos' query
       $videoQuery = buildYouTubeQuery('videos', $videoId, $apiKey);
       $videos[$v]['query'] = $videoQuery; // added for debugging purposes
       if ($videoContent = fileGetContents($videoQuery)) {
@@ -697,10 +737,64 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
   return $videos;
 }
 
-function showBottom() {
+function applyFilter($videos,$filter) {
 
-  echo "</body>\n";
-  echo "</html>";
+  // $videos is an array of video data
+  // $filter is an array with 'type' and 'value'
+  // All filters are based on views
+  // First, must sort $videos array by views DESC
+  $numVideos = sizeof($videos);
+
+  if ($filter['type'] == 'views') {
+    // include only videos with X views
+    $i=0;
+    while ($i < $numVideos) {
+      if ($videos[$i]['views'] >= $filter['value']) {
+        $v[] = $videos[$i];
+      }
+      $i++;
+    }
+    return $v;
+  }
+  elseif ($filter['type'] == 'percentile') {
+    // include only videos in the Xth percentile (based on views)
+    $videos = sortVideosByViews($videos,SORT_ASC);
+    $percentile = $filter['value'];
+    $i = ($percentile/100) * $numVideos; // this is the starting index for the target percentile
+    while ($i < $numVideos) {
+      $v[] = $videos[$i];
+      $i++;
+    }
+    return $v;
+  }
+  elseif ($filter['type'] == 'count') {
+    // include only videos in the Top X (based on views)
+    if ($filter['value'] < $numVideos) {
+      $videos = sortVideosByViews($videos,SORT_DESC);
+      $i=0;
+      while ($i < $filter['value']) {
+        $v[] = $videos[$i];
+        $i++;
+      }
+      return $v;
+    }
+    else {
+      // there are fewer than X videos in this channel.
+      // Return all videos
+      return $videos;
+    }
+  }
+}
+
+function sortVideosByViews($videos,$sort) {
+
+  // return $videos array sorted by views
+  // $sort is either SORT_ASC or SORT_DESC
+  foreach ($videos as $key=>$row) {
+    $views[$key] = $row['views'];
+  }
+  array_multisort($views, $sort, $videos);
+  return $videos;
 }
 
 function calcDuration($videos,$numVideos,$captioned=NULL,$viewThreshold=NULL) {
@@ -853,6 +947,32 @@ function countCaptioned($videos,$numVideos,$viewThreshold=NULL) {
     $i++;
   }
   return $c;
+}
+
+function getOrdinalSuffix($value) {
+
+  // return the ordinal suffix of $value
+  $num = $value % 100; // protect against large numbers
+  if($num < 11 || $num > 13) { // 11, 12, and 13 are special cases
+    switch($num % 10) {
+      case 1:
+        $suffix = 'st';
+        break;
+      case 2:
+        $suffix = 'nd';
+        break;
+      case 3:
+        $suffix = 'rd';
+        break;
+      default:
+        $suffix = 'th';
+        break;
+    }
+  }
+  else {
+    $suffix = 'th';
+  }
+  return $suffix;
 }
 
 function showArray($array) {

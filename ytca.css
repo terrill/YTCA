@@ -56,6 +56,13 @@ p.date {
 p.error {
   font-weight: bold;
 }
+p.filterSettings {
+  margin: 1em;
+  font-weight: bold;
+}
+p.filterSettings span.filterValue {
+  color: #c00;
+}
 p.footnote {
   margin-left: 2em;
 }
