@@ -18,10 +18,10 @@ body {
 
 /*
  *
- * Report table
+ * Data tables
  *
  */
-table#report {
+table {
   border: 1px solid black;
   border-collapse: collapse;
 }
@@ -40,6 +40,27 @@ td a {
   text-decoration: underline;
 }
 tr.totals td {
+  font-weight: bold;
+}
+table.videoDetails {
+  margin-left: 1em;
+}
+table.videoDetails td.ccYes {
+  color: #093;
+}
+table.videoDetails td.ccNo {
+  color: #C00;
+}
+
+/*
+ *
+ * Report lists
+ *
+ */
+ul.channelDetails li {
+  margin-bottom: 0.15em;
+}
+ul.channelDetails li span.value {
   font-weight: bold;
 }
 

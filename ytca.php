@@ -184,9 +184,11 @@ if ($numChannels > 0) {
       // this is not a valid channel ID; must be a username
       $channels[$c]['id'] = getChannelId($apiKey,$channels[$c]['id']);
     }
-    if ($c == 0) {
-      $firstChannelName = $channels[0]['name'];
-      showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit,$filter);
+    if ($report == 'summary') {
+      if ($c == 0) {
+        $firstChannelName = $channels[0]['name'];
+        showSummaryTableTop($report,$numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit,$filter);
+      }
     }
     $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],$apiKey);
 
@@ -253,30 +255,39 @@ if ($numChannels > 0) {
       $nextChannelName = $channels[$rowNum]['name'];
     }
 
-    showTableRow($rowNum,$numChannels,$channels[$c]['id'],$channels[$c]['name'],$nextChannelName,$channelMeta[$c],$channelData,$timeUnit,$includeLinks,$includeChannelId,$filter,$highlights);
-
-    // increment totals with values from this channel
-    $totals['all']['count'] += $channelData['all']['count'];
-    $totals['all']['duration'] +=  $channelData['all']['duration'];
-    $totals['all']['views'] +=  $channelData['all']['views'];
-    if ($channelData['all']['maxViews'] > $totals['all']['maxViews']) {
-      $totals['all']['maxViews'] = $channelData['all']['maxViews'];
+    if ($report == 'details') {
+      echo '<h2>Channel '.$rowNum.' of '.$numChannels.': '.$channels[$c]['name']."</h2>\n";
+      showDetailsList($channels[$c]['id'],$channelMeta[$c],$channelData,$timeUnit,$includeLinks,$includeChannelId,$filter);
+      showDetailsTable($videos,$numVideos);
     }
-    $totals['cc']['count'] += $channelData['cc']['count'];
-    $totals['cc']['duration'] += $channelData['cc']['duration'];
-    if (!$filter) {
-      // no reason to separate out high traffic videos if already filtering for high traffic
-      $totals['highTraffic']['count'] += $channelData['highTraffic']['count'];
-      $totals['highTraffic']['duration'] += $channelData['highTraffic']['duration'];
-      $totals['ccHighTraffic']['count'] += $channelData['ccHighTraffic']['count'];
-      $totals['ccHighTraffic']['duration'] += $channelData['ccHighTraffic']['duration'];
+    else { // show a summary report
+      showSummaryTableRow($report,$rowNum,$numChannels,$channels[$c]['id'],$channels[$c]['name'],$nextChannelName,$channelMeta[$c],$channelData,$timeUnit,$includeLinks,$includeChannelId,$filter,$highlights);
+
+      // increment totals with values from this channel
+      $totals['all']['count'] += $channelData['all']['count'];
+      $totals['all']['duration'] +=  $channelData['all']['duration'];
+      $totals['all']['views'] +=  $channelData['all']['views'];
+      if ($channelData['all']['maxViews'] > $totals['all']['maxViews']) {
+        $totals['all']['maxViews'] = $channelData['all']['maxViews'];
+      }
+      $totals['cc']['count'] += $channelData['cc']['count'];
+      $totals['cc']['duration'] += $channelData['cc']['duration'];
+      if (!$filter) {
+        // no reason to separate out high traffic videos if already filtering for high traffic
+        $totals['highTraffic']['count'] += $channelData['highTraffic']['count'];
+        $totals['highTraffic']['duration'] += $channelData['highTraffic']['duration'];
+        $totals['ccHighTraffic']['count'] += $channelData['ccHighTraffic']['count'];
+        $totals['ccHighTraffic']['duration'] += $channelData['ccHighTraffic']['duration'];
+      }
     }
     $c++;
   }
 
-  // add totals row
-  showTableRow('totals',$numChannels,NULL,NULL,NULL,$channelMeta[0],$totals,$timeUnit,$includeLinks,$includeChannelId,$filter);
-  showTableBottom();
+  if ($report == 'summary') {
+    // add totals row
+    showSummaryTableRow($report,'totals',$numChannels,NULL,NULL,NULL,$channelMeta[0],$totals,$timeUnit,$includeLinks,$includeChannelId,$filter);
+    showSummaryTableBottom();
+  }
 }
 else {
   // handle error - no channels were found
@@ -331,7 +342,7 @@ function showTop($title,$goodColor,$badColor,$filter=NULL) {
   }
 }
 
-function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit,$filter) {
+function showSummaryTableTop($report,$numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit,$filter) {
 
   // $metaData is an array of 'keys' and 'values' for each channel; or false
 
@@ -383,7 +394,7 @@ function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChanne
   flush();
 }
 
-function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$nextChannelName=NULL,$metaData=NULL,$channelData,$timeUnit,$includeLinks,$includeChannelId,$filter=NULL,$highlights=NULL) {
+function showSummaryTableRow($report,$rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$nextChannelName=NULL,$metaData=NULL,$channelData,$timeUnit,$includeLinks,$includeChannelId,$filter=NULL,$highlights=NULL) {
 
   // $rowNum is either an integer, or 'totals'
 
@@ -493,7 +504,7 @@ function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$ne
   flush();
 }
 
-function showTableBottom() {
+function showSummaryTableBottom() {
 
   echo "</tbody>\n";
   echo "</table>\n";
@@ -503,6 +514,113 @@ function showBottom() {
 
   echo "</body>\n";
   echo "</html>";
+}
+
+function showDetailsList($channelId,$channelMeta,$channelData,$timeUnit,$includeLinks,$includeChannelId,$filter) {
+
+  // show a list of summary data for channel, in conjunction with the video details table
+
+  // calculate percentages and averages
+  $pctCaptioned = round($channelData['cc']['count']/$channelData['all']['count'] * 100,1);
+  $avgViews = round($channelData['all']['views']/$channelData['all']['count']); // an integer, don't need precision
+
+  echo '<ul class="channelDetails">'."\n";
+  // link to YouTube channel
+  if ($includeLinks && $includeChannelId) {
+    $channelLink = 'https://www.youtube.com/channel/'.$channelId;
+    echo '<li><a href="'.$channelLink.'">'.$channelLink.'</a></li>'."\n";
+  }
+  // channel meta data
+  $numMeta = sizeof($channelMeta);
+  if ($numMeta) {
+    foreach ($channelMeta as $key => $value) {
+      echo '<li>'.$key.': <span class="value">'.$value."</span></li>\n";
+    }
+  }
+  // Number of videos
+  echo '<li>Number of videos: <span class="value">';
+  echo number_format($channelData['all']['count']).'</span></li>'."\n";
+
+  // Number / percent captioned
+  echo '<li>Number captioned: <span class="value">';
+  number_format($channelData['cc']['count']).'</span> ';
+  echo '(<span class="value">'.number_format($pctCaptioned,1).'%</span>)</li>'."\n";
+
+  // Duration
+  echo '<li>Total '.$timeUnit.': <span class="value">';
+  echo formatDuration($channelData['all']['duration'],$timeUnit).'</span></li>'."\n";
+
+  // Duration (captioned)
+  echo '<li>'.ucfirst($timeUnit).' captioned: <span class="value">';
+  echo formatDuration($channelData['cc']['duration'],$timeUnit)."</span></td>\n";
+
+  // Average views
+  echo '<li>Average views: <span class="value">'.number_format($avgViews)."</span></li>\n";
+  echo '<li>Max views: <span class="value">'.number_format($channelData['all']['maxViews'])."</span></li>\n";
+
+  if (!$filter) {
+    // high traffic data is only included for non-filtered channels
+    echo '<li>Number of high traffic videos: <span class="value">';
+    echo number_format($channelData['highTraffic']['count'])."</span></li>\n";
+    echo '<li>Number captioned (high traffic): <span class="value">';
+    echo number_format($channelData['ccHighTraffic']['count']).'</span> ';
+    echo '(<span class="value">'.number_format($pctCaptionedHighTraffic,1)."%</span>)</li>\n";
+    echo '<li>'.ucfirst($timeUnit).' captioned (high traffic): <span class="value">';
+    echo formatDuration($channelData['ccHighTraffic']['duration'],$timeUnit)."</span></li>\n";
+  }
+
+  echo "</ul>\n";
+
+  // write output immediately to screen
+  ob_flush();
+  flush();
+}
+
+function showDetailsTable($videos,$numVideos) {
+
+  if ($numVideos) {
+    // show table head
+    echo '<table class="videoDetails">'."\n";
+    echo '<thead>'."\n";
+    echo '<tr>'."\n";
+    echo '<th scope="col">Video Title</th>'."\n";
+    echo '<th scope="col">Duration</th>'."\n";
+    echo '<th scope="col">Captioned</th>'."\n";
+    echo '<th scope="col">Views</th>'."\n";
+    echo "</tr>\n";
+    echo "</thead>\n";
+    echo '<tbody>'."\n";
+    ob_flush();
+    flush();
+
+    // sort videos by views DESC
+    sortVideosByViews($videos,SORT_DESC);
+
+    $i=0;
+    while ($i < $numVideos) {
+      echo '<tr>'."\n";
+      echo '<td>'.$videos[$i]['title']."</td>\n";
+      echo '<td>'.convertToHMS($videos[$i]['duration'])."</td>\n";
+      if ($videos[$i]['captions'] == 'true') {
+        echo '<td class="ccYes">Yes</td>'."\n";
+      }
+      elseif ($videos[$i]['captions'] == 'false') {
+        echo '<td class="ccNo">No</td>'."\n";
+      }
+      echo '<td>'.$videos[$i]['views']."</td>\n";
+      echo "</tr>\n";
+      ob_flush();
+      flush();
+      $i++;
+    }
+    echo '</tbody>'."\n";
+    echo "</table>\n";
+  }
+  else {
+    echo '<p>No videos to show.</p>'."\n";
+  }
+  ob_flush();
+  flush();
 }
 
 function isValid($var, $value, $filterType=NULL) {
@@ -717,19 +835,21 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
     $i=0;
     while ($i < $finalIndex) {
       $videoId = $json['items'][$i]['id']['videoId'];
-      $videos[$v]['id'] = $videoId;
-      $videos[$v]['title'] = $json['items'][$i]['snippet']['title'];
+      if ($videoId) {
       // get details about this video via a 'videos' query
-      $videoQuery = buildYouTubeQuery('videos', $videoId, $apiKey);
-      $videos[$v]['query'] = $videoQuery; // added for debugging purposes
-      if ($videoContent = fileGetContents($videoQuery)) {
-        $videos[$v]['status'] = 'Success!'; // added for debugging purposes
-        $videoJson = json_decode($videoContent,true);
-        $videos[$v]['duration'] = $videoJson['items'][0]['contentDetails']['duration']; // in seconds
-        $videos[$v]['captions'] = $videoJson['items'][0]['contentDetails']['caption']; // 'true' or 'false'
-        $videos[$v]['views'] = $videoJson['items'][0]['statistics']['viewCount'];
+        $videoQuery = buildYouTubeQuery('videos', $videoId, $apiKey);
+        if ($videoContent = fileGetContents($videoQuery)) {
+          $videos[$v]['id'] = $videoId;
+          $videos[$v]['title'] = $json['items'][$i]['snippet']['title'];
+          $videoJson = json_decode($videoContent,true);
+          $videos[$v]['duration'] = $videoJson['items'][0]['contentDetails']['duration']; // in seconds
+          $videos[$v]['captions'] = $videoJson['items'][0]['contentDetails']['caption']; // 'true' or 'false'
+          $videos[$v]['views'] = $videoJson['items'][0]['statistics']['viewCount'];
+          $videos[$v]['query'] = $videoQuery; // added for debugging purposes
+          $videos[$v]['status'] = 'Success!'; // added for debugging purposes
+          $v++;
+        }
       }
-      $v++;
       $i++;
     }
     $q++;
@@ -889,6 +1009,15 @@ function convertToSeconds($duration) {
   $interval = new DateInterval($duration);
   return ($interval->h*3600)+($interval->i*60)+($interval->s);
 }
+
+function convertToHMS($duration) {
+
+  // see comments above about $duration dormat
+  // convert to HH:MM:SS
+  $interval = new DateInterval($duration);
+  return ($interval->h*3600)+($interval->i*60)+($interval->s);
+}
+
 
 function makeTimeReadable($seconds) {
 
