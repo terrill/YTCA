@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.4
+ * version 1.0.5
  *
  */
 
@@ -291,8 +291,8 @@ function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChanne
   if ($includeChannelId) {
     echo '<th scope="col">YouTube ID</th>'."\n";
   }
-  if ($metaData) {
-    $metaKeys = array_keys($metaData[0]); // get keys from first channel in array
+  if ($channelMeta) {
+    $metaKeys = array_keys($channelMeta[0]); // get keys from first channel in array
     $numMeta = sizeof($metaKeys);
     // there is supplemental meta data
     // display a column header for each metaData key
@@ -356,24 +356,37 @@ function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$ne
     echo '<th scope="row" colspan="'.$colSpan.'">TOTALS</th>'."\n";
   }
   else {
+    $channelTitle = NULL;
     if ($highlights['use']) {
       if ($pctCaptioned >= $highlights['goodPct']) {
-        echo ' class="goodChannel">'."\n";
+        $classes[] = 'goodChannel';
         $channelTitle = ' title="'.$highlights['goodLabel'].'"';
       }
       elseif ($pctCaptioned <= $highlights['badPct']) {
-        echo ' class="badChannel">'."\n";
+        $classes[] = 'badChannel';
         $channelTitle = ' title="'.$highlights['badLabel'].'"';
       }
-      else {
-        echo '>'."\n";
-        $channelTitle = NULL;
+    }
+    if ($numMeta) {
+      // add a class for each metadata value
+      foreach ($metaData as $key => $value) {
+        $classes[] = 'meta_'.$value;
       }
     }
-    else {
-      echo '>'."\n";
-      $channelTitle = NULL;
+    if (is_array($classes) && sizeof($classes) > 0) {
+      echo ' class="';
+      $i=0;
+      while ($i < sizeof($classes)) {
+        if ($i > 0) {
+          echo ' ';
+        }
+        echo $classes[$i];
+        $i++;
+      }
+      echo '"';
     }
+    echo ">\n";
+
     echo '<td>'.$rowNum."</td>\n";
     echo '<th scope="row">';
     if ($includeLinks) {
