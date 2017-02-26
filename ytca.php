@@ -150,14 +150,16 @@ if ($numChannels > 0) {
     ob_start();
   }
 
-  showTableTop($includeChannelId,$channelMeta);
-
   $c = 0;
   while ($c < $numChannels) {
 
     if (!(ischannelId($channels[$c]['id']))) {
       // this is not a valid channel ID; must be a username
       $channels[$c]['id'] = getChannelId($apiKey,$channels[$c]['id']);
+    }
+    if ($c == 0) {
+      $firstChannelName = $channels[0]['name'];
+      showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId);
     }
     $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],$apiKey);
 
@@ -217,7 +219,11 @@ if ($numChannels > 0) {
     $channelData['ccHighTraffic']['duration'] = calcDuration($videos,$numVideos,'true',$highTrafficThreshold);
 
     $rowNum = $c + 1;
-    showTableRow($rowNum,$channels[$c]['id'],$channels[$c]['name'],$channelMeta[$c],$channelData,$includeLinks,$includeChannelId,$highlights);
+    if ($rowNum < $numChannels) {
+      $nextChannelName = $channels[$rowNum]['name'];
+    }
+
+    showTableRow($rowNum,$numChannels,$channels[$c]['id'],$channels[$c]['name'],$nextChannelName,$channelMeta[$c],$channelData,$includeLinks,$includeChannelId,$highlights);
 
     // increment totals with values from this channel
     $totals['all']['count'] += $channelData['all']['count'];
@@ -234,7 +240,7 @@ if ($numChannels > 0) {
   }
 
   // add totals row
-  showTableRow('totals',NULL,NULL,$channelMeta[0],$totals,$includeLinks,$includeChannelId,$highlights);
+  showTableRow('totals',$numChannels,NULL,NULL,NULL,$channelMeta[0],$totals,$includeLinks,$includeChannelId,$highlights);
   showTableBottom();
 }
 else {
@@ -260,13 +266,62 @@ function showTop($title,$goodColor,$badColor) {
   echo "}\n";
   echo "</style>\n";
   echo "</head>\n";
-  echo "<body>\n";
+  echo '<body id="ytca">'."\n";
   echo '<h1>'.$title."</h1>\n";
   echo '<p class="date">'.date('M d, Y')."</p>\n";
-  echo '<div id="status"></div>'."\n";
+  echo '<div id="status" role="alert"></div>'."\n";
+  echo '<script src="ytca.js"></script>'."\n";
 }
 
-function showTableRow($rowNum,$channelId=NULL,$channelName=NULL,$metaData=NULL,$channelData,$includeLinks,$includeChannelId,$highlights) {
+function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId) {
+
+  // $metaData is an array of 'keys' and 'values' for each channel; or false
+
+  echo '<table id="report">'."\n";
+  echo '<thead>'."\n";
+  echo '<tr';
+  // add a data-status attribute that's used by ytca.js to populate the status message at the top of the page
+  // this reflects the *next* channel, since it isn't written to the screen until the channel row is complete
+  if ($firstChannelName) {
+    echo ' data-status="Processing Channel 1 of '.$numChannels.': '.$firstChannelName.'..."';
+  }
+  echo '>'."\n";
+  echo '<th scope="col">ID</th>'."\n";
+  echo '<th scope="col">YouTube Channel</th>'."\n";
+  if ($includeChannelId) {
+    echo '<th scope="col">YouTube ID</th>'."\n";
+  }
+  if ($metaData) {
+    $metaKeys = array_keys($metaData[0]); // get keys from first channel in array
+    $numMeta = sizeof($metaKeys);
+    // there is supplemental meta data
+    // display a column header for each metaData key
+    $i = 0;
+    while ($i < $numMeta) {
+      echo '<th scope="col">'.$metaKeys[$i]."</th>\n";
+      $i++;
+    }
+  }
+  echo '<th scope="col"># Videos</th>'."\n";
+  echo '<th scope="col">Duration</th>'."\n";
+  echo '<th scope="col"># Captioned</th>'."\n";
+  echo '<th scope="col">% Captioned</th>'."\n";
+  echo '<th scope="col">Mean # Views per Video</th>'."\n";
+  echo '<th scope="col"># Videos High Traffic</th>'."\n";
+  echo '<th scope="col"># Captioned High Traffic</th>'."\n";
+  echo '<th scope="col">% Captioned High Traffic</th>'."\n";
+  echo '<th scope="col">Duration Captioned</th>'."\n";
+  echo '<th scope="col">Duration Captioned High Traffic</th>'."\n";
+  echo "</tr>\n";
+  echo '</thead>'."\n";
+  echo '<tbody>'."\n";
+
+  // write output immediatley to screen
+  ob_flush();
+  flush();
+}
+
+function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$nextChannelName=NULL,$metaData=NULL,$channelData,$includeLinks,$includeChannelId,$highlights) {
 
   // $rowNum is either an integer, or 'totals'
 
@@ -275,7 +330,18 @@ function showTableRow($rowNum,$channelId=NULL,$channelName=NULL,$metaData=NULL,$
   $pctCaptionedHighTraffic = round($channelData['ccHighTraffic']['count']/$channelData['highTraffic']['count'] * 100,1);
   $avgViews = round($channelData['all']['views']/$channelData['all']['count']); // an integer, don't need precision
 
-  echo '<tr';
+  echo '<tr ';
+
+  // add a data-status attribute that's used by ytca.js to populate the status message at the top of the page
+  // this reflects the *next* channel, since it isn't written to the screen until the channel row is complete
+  if ($nextChannelName) {
+    $nextRow = $rowNum + 1;
+    echo ' data-status="Processing Channel '.$nextRow.' of '.$numChannels.': '.$nextChannelName.'..."';
+  }
+  elseif ($rowNum == 'totals') {
+    echo ' data-status="Analysis complete."';
+  }
+
   $numMeta = sizeof($metaData);
   if ($rowNum == 'totals') {
     echo ' class="totals">';
@@ -343,6 +409,12 @@ function showTableRow($rowNum,$channelId=NULL,$channelName=NULL,$metaData=NULL,$
   // write output immediately to screen
   ob_flush();
   flush();
+}
+
+function showTableBottom() {
+
+  echo "</tbody>\n";
+  echo "</table>\n";
 }
 
 function isValid($var, $value, $filterType=NULL) {
@@ -572,55 +644,6 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
     $q++;
   }
   return $videos;
-}
-
-
-function showTableTop($includeChannelId,$metaData) {
-
-  // $metaData is an array of 'keys' and 'values' for each channel; or false
-
-  echo '<table>'."\n";
-  echo '<thead>'."\n";
-  echo '<tr>'."\n";
-  echo '<th scope="col">ID</th>'."\n";
-  echo '<th scope="col">YouTube Channel</th>'."\n";
-  if ($includeChannelId) {
-    echo '<th scope="col">YouTube ID</th>'."\n";
-  }
-  if ($metaData) {
-    $metaKeys = array_keys($metaData[0]); // get keys from first channel in array
-    $numMeta = sizeof($metaKeys);
-    // there is supplemental meta data
-    // display a column header for each metaData key
-    $i = 0;
-    while ($i < $numMeta) {
-      echo '<th scope="col">'.$metaKeys[$i]."</th>\n";
-      $i++;
-    }
-  }
-  echo '<th scope="col"># Videos</th>'."\n";
-  echo '<th scope="col">Duration</th>'."\n";
-  echo '<th scope="col"># Captioned</th>'."\n";
-  echo '<th scope="col">% Captioned</th>'."\n";
-  echo '<th scope="col">Mean # Views per Video</th>'."\n";
-  echo '<th scope="col"># Videos High Traffic</th>'."\n";
-  echo '<th scope="col"># Captioned High Traffic</th>'."\n";
-  echo '<th scope="col">% Captioned High Traffic</th>'."\n";
-  echo '<th scope="col">Duration Captioned</th>'."\n";
-  echo '<th scope="col">Duration Captioned High Traffic</th>'."\n";
-  echo "</tr>\n";
-  echo '</thead>'."\n";
-  echo '<tbody>'."\n";
-
-  // write output immediatley to screen
-  ob_flush();
-  flush();
-}
-
-function showTableBottom() {
-
-  echo "</tbody>\n";
-  echo "</table>\n";
 }
 
 function showBottom() {

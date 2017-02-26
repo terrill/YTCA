@@ -21,7 +21,7 @@ body {
  * Report table
  *
  */
-table {
+table#report {
   border: 1px solid black;
   border-collapse: collapse;
 }
@@ -45,31 +45,6 @@ tr.totals td {
 
 /*
  *
- * Form fields (used when processing one channel at a time)
- *
- */
-
-input[type="submit"] {
-  margin: 1em;
-  font-size: 1em;
-  border: 1px solid #666;
-  border-radius: 5px;
-  padding: 0.15em;
-  background-color:#9F9
-}
-input[type="submit"]:hover,
-input[type="submit"]:focus,
-input[type="submit"]:active {
-  background-color: black;
-  border-color: #9F9;
-  color: white;
-}
-textarea {
-  display: none;
-}
-
-/*
- *
  * Misc styles
  *
  */
@@ -84,4 +59,13 @@ p.error {
 p.footnote {
   margin-left: 2em;
 }
-
+div#status {
+  display: none;
+	border: 2px solid orange;
+	margin: 1em;
+	max-width: 40em;
+	background-color: #FFC;
+	padding: 1em;
+	font-weight: bold;
+	font-size: 1.1em;
+}
