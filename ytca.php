@@ -16,6 +16,9 @@
 // Store API key in a local file
 $apiKeyFile = 'apikey'; // name of local file in which API key is stored
 
+// Path to channels ini file (can be overwritten with parameter 'channels' in URL)
+$channelsFile = 'channels.ini';
+
 // Output (can be overwritten with parameter 'output' in URL)
 // Supported values: html, xml, json
 $output = 'html';
@@ -98,6 +101,12 @@ if (isset($_GET['title'])) {
     $title = urldecode(strip_tags($_GET['title']));
   }
 }
+if (isset($_GET['channels'])) {
+  if (isValid('channels',strip_tags($_GET['channels']))) {
+    $channelsFile = urldecode(strip_tags($_GET['channels']));
+  }
+}
+
 
 showTop($title,$highlights['goodColor'],$highlights['badColor']);
 
@@ -118,7 +127,7 @@ if ($channelId = $_GET['channelid']) {
 }
 else {
   // get channel(s) from ini file
-  $channels = parse_ini_file('channels.ini',true);
+  $channels = parse_ini_file($channelsFile,true);
 }
 $numChannels = sizeof($channels);
 
@@ -450,8 +459,8 @@ function isValid($var, $value, $filterType=NULL) {
       }
     }
   }
-  elseif ($var == 'title') {
-    // not currently any rules for title
+  elseif ($var == 'title' || $var == 'channels') {
+    // not currently any rules for these vars
     // may need to add some
     // For example, could check to see if title is properly URL-encoded
     return true;
