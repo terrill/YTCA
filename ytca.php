@@ -47,6 +47,10 @@ $filterValue = NULL;
 // Title of report (can be overwritten with URL-encoded parameter 'title' in URL)
 $title = 'YouTube Caption Auditor (YTCA) Report';
 
+// Time unit for "Duration" data (can be overwritten with 'timeunit' in URL)
+// Supported values are 'seconds' (default), 'minutes', or 'hours'
+$timeUnit = 'seconds';
+
 // Include Links
 // Set to true to make channel names hyperlinks to the YouTube channel; otherwise set to false
 $includeLinks = true;
@@ -103,6 +107,11 @@ if (isset($_GET['filtertype']) && isset($_GET['filtervalue'])) {
 if (isset($_GET['title'])) {
   if (isValid('title',strip_tags($_GET['title']))) {
     $title = urldecode(strip_tags($_GET['title']));
+  }
+}
+if (isset($_GET['timeunit'])) {
+  if (isValid('timeUnit',strtolower($_GET['timeunit']))) {
+    $timeUnit = strtolower($_GET['timeunit']);
   }
 }
 if (isset($_GET['channels'])) {
@@ -172,7 +181,7 @@ if ($numChannels > 0) {
     }
     if ($c == 0) {
       $firstChannelName = $channels[0]['name'];
-      showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId);
+      showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit);
     }
     $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],$apiKey);
 
@@ -238,7 +247,7 @@ if ($numChannels > 0) {
       $nextChannelName = $channels[$rowNum]['name'];
     }
 
-    showTableRow($rowNum,$numChannels,$channels[$c]['id'],$channels[$c]['name'],$nextChannelName,$channelMeta[$c],$channelData,$includeLinks,$includeChannelId,$highlights);
+    showTableRow($rowNum,$numChannels,$channels[$c]['id'],$channels[$c]['name'],$nextChannelName,$channelMeta[$c],$channelData,$timeUnit,$includeLinks,$includeChannelId,$highlights);
 
     // increment totals with values from this channel
     $totals['all']['count'] += $channelData['all']['count'];
@@ -258,7 +267,7 @@ if ($numChannels > 0) {
   }
 
   // add totals row
-  showTableRow('totals',$numChannels,NULL,NULL,NULL,$channelMeta[0],$totals,$includeLinks,$includeChannelId,$highlights);
+  showTableRow('totals',$numChannels,NULL,NULL,NULL,$channelMeta[0],$totals,$timeUnit,$includeLinks,$includeChannelId,$highlights);
   showTableBottom();
 }
 else {
@@ -297,7 +306,7 @@ function showTop($title,$goodColor,$badColor) {
   echo '<script src="ytca.js"></script>'."\n";
 }
 
-function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId) {
+function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChannelId,$timeUnit) {
 
   // $metaData is an array of 'keys' and 'values' for each channel; or false
 
@@ -327,16 +336,16 @@ function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChanne
     }
   }
   echo '<th scope="col"># Videos</th>'."\n";
-  echo '<th scope="col">Duration</th>'."\n";
   echo '<th scope="col"># Captioned</th>'."\n";
   echo '<th scope="col">% Captioned</th>'."\n";
+  echo '<th scope="col"># '.ucfirst($timeUnit)."</th>\n";
+  echo '<th scope="col"># '.ucfirst($timeUnit).' Captioned</th>'."\n";
   echo '<th scope="col">Mean Views per Video</th>'."\n";
   echo '<th scope="col">Max Views</th>'."\n";
   echo '<th scope="col"># Videos High Traffic</th>'."\n";
   echo '<th scope="col"># Captioned High Traffic</th>'."\n";
   echo '<th scope="col">% Captioned High Traffic</th>'."\n";
-  echo '<th scope="col">Duration Captioned</th>'."\n";
-  echo '<th scope="col">Duration Captioned High Traffic</th>'."\n";
+  echo '<th scope="col"># '.ucfirst($timeUnit).' Captioned High Traffic</th>'."\n";
   echo "</tr>\n";
   echo '</thead>'."\n";
   echo '<tbody>'."\n";
@@ -346,7 +355,7 @@ function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChanne
   flush();
 }
 
-function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$nextChannelName=NULL,$metaData=NULL,$channelData,$includeLinks,$includeChannelId,$highlights) {
+function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$nextChannelName=NULL,$metaData=NULL,$channelData,$timeUnit,$includeLinks,$includeChannelId,$highlights) {
 
   // $rowNum is either an integer, or 'totals'
 
@@ -433,16 +442,16 @@ function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$ne
     }
   } // end if not totals row
   echo '<td class="data">'.number_format($channelData['all']['count'])."</td>\n";
-  echo '<td class="data">'.number_format($channelData['all']['duration'])."</td>\n";
   echo '<td class="data">'.number_format($channelData['cc']['count'])."</td>\n";
   echo '<td class="data">'.number_format($pctCaptioned,1)."%</td>\n";
+  echo '<td class="data">'.formatDuration($channelData['all']['duration'],$timeUnit)."</td>\n";
+  echo '<td class="data">'.formatDuration($channelData['cc']['duration'],$timeUnit)."</td>\n";
   echo '<td class="data">'.number_format($avgViews)."</td>\n";
   echo '<td class="data">'.number_format($channelData['all']['maxViews'])."</td>\n";
   echo '<td class="data">'.number_format($channelData['highTraffic']['count'])."</td>\n";
   echo '<td class="data">'.number_format($channelData['ccHighTraffic']['count'])."</td>\n";
   echo '<td class="data">'.number_format($pctCaptionedHighTraffic,1)."%</td>\n";
-  echo '<td class="data">'.number_format($channelData['cc']['duration'])."</td>\n";
-  echo '<td class="data">'.number_format($channelData['ccHighTraffic']['duration'])."</td>\n";
+  echo '<td class="data">'.formatDuration($channelData['ccHighTraffic']['duration'],$timeUnit)."</td>\n";
   echo "</tr>\n";
 
   // write output immediately to screen
@@ -491,6 +500,9 @@ function isValid($var, $value, $filterType=NULL) {
     }
     elseif ($var == 'filterType') {
       $allowed = array('views','percentile','count');
+    }
+    elseif ($var == 'timeUnit') {
+      $allowed = array('seconds','minutes','hours');
     }
     if (in_array($value,$allowed)) {
       return true;
@@ -806,6 +818,20 @@ function makeTimeReadable($seconds) {
   }
   $time .= $seconds.' seconds';
   return $time; // I've had enough of it!
+}
+
+function formatDuration($seconds, $timeUnit) {
+
+  // $timeUnit is either 'seconds', 'minutes', or 'hours'
+  if ($timeUnit == 'seconds') {
+    return number_format($seconds);
+  }
+  elseif ($timeUnit == 'minutes') {
+    return number_format(($seconds / 60), 2);
+  }
+  elseif ($timeUnit == 'hours') {
+    return number_format(($seconds / 3600), 2);
+  }
 }
 
 function countCaptioned($videos,$numVideos,$viewThreshold=NULL) {
