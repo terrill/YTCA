@@ -139,6 +139,7 @@ if ($numChannels > 0) {
   $totals['all']['count'] = 0;
   $totals['all']['duration'] = 0;
   $totals['all']['views'] = 0;
+  $totals['all']['maxViews'] = 0;
 
   // captioned videos (count and duration)
   $totals['cc']['count'] = 0;
@@ -213,7 +214,9 @@ if ($numChannels > 0) {
     // add values to channel totals
     $channelData['all']['count'] = $numVideos;
     $channelData['all']['duration'] = calcDuration($videos,$numVideos);
-    $channelData['all']['views'] = countViews($videos,$numVideos);
+    $viewsData = countViews($videos,$numVideos); // returns array with keys 'count' and 'max'
+    $channelData['all']['views'] = $viewsData['count'];
+    $channelData['all']['maxViews'] = $viewsData['max'];
     $channelData['cc']['count'] = countCaptioned($videos,$numVideos);
     $channelData['cc']['duration'] = calcDuration($videos,$numVideos,'true');
     if ($minViews > 0) { // TODO: Update this to use new filter variables
@@ -238,6 +241,9 @@ if ($numChannels > 0) {
     $totals['all']['count'] += $channelData['all']['count'];
     $totals['all']['duration'] +=  $channelData['all']['duration'];
     $totals['all']['views'] +=  $channelData['all']['views'];
+    if ($channelData['all']['maxViews'] > $totals['all']['maxViews']) {
+      $totals['all']['maxViews'] = $channelData['all']['maxViews'];
+    }
     $totals['cc']['count'] += $channelData['cc']['count'];
     $totals['cc']['duration'] += $channelData['cc']['duration'];
     $totals['highTraffic']['count'] += $channelData['highTraffic']['count'];
@@ -315,7 +321,8 @@ function showTableTop($numChannels,$firstChannelName,$channelMeta,$includeChanne
   echo '<th scope="col">Duration</th>'."\n";
   echo '<th scope="col"># Captioned</th>'."\n";
   echo '<th scope="col">% Captioned</th>'."\n";
-  echo '<th scope="col">Mean # Views per Video</th>'."\n";
+  echo '<th scope="col">Mean Views per Video</th>'."\n";
+  echo '<th scope="col">Max Views</th>'."\n";
   echo '<th scope="col"># Videos High Traffic</th>'."\n";
   echo '<th scope="col"># Captioned High Traffic</th>'."\n";
   echo '<th scope="col">% Captioned High Traffic</th>'."\n";
@@ -421,6 +428,7 @@ function showTableRow($rowNum,$numChannels,$channelId=NULL,$channelName=NULL,$ne
   echo '<td class="data">'.number_format($channelData['cc']['count'])."</td>\n";
   echo '<td class="data">'.number_format($pctCaptioned,1)."%</td>\n";
   echo '<td class="data">'.number_format($avgViews)."</td>\n";
+  echo '<td class="data">'.number_format($channelData['all']['maxViews'])."</td>\n";
   echo '<td class="data">'.number_format($channelData['highTraffic']['count'])."</td>\n";
   echo '<td class="data">'.number_format($channelData['ccHighTraffic']['count'])."</td>\n";
   echo '<td class="data">'.number_format($pctCaptionedHighTraffic,1)."%</td>\n";
@@ -727,14 +735,20 @@ function calcDuration($videos,$numVideos,$captioned=NULL,$viewThreshold=NULL) {
 
 function countViews($videos,$numVideos) {
 
-  // returns total number of views for all $videos
+  // returns array with keys 'count' and 'max'
   $i=0;
-  $totalViews=0;
+  $count=0;
+  $max=0;
   while ($i < $numVideos) {
-    $totalViews += $videos[$i]['views'];
+    $count += $videos[$i]['views'];
+    if ($videos[$i]['views'] > $max) {
+      $max = $videos[$i]['views'];
+    }
     $i++;
   }
-  return $totalViews;
+  $result['count'] = $count;
+  $result['max'] = $max;
+  return $result;
 }
 
 function countHighTraffic ($videos,$numVideos,$threshold) {
