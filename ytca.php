@@ -237,14 +237,11 @@ if ($numChannels > 0) {
     $viewsData = countViews($videos,$numVideos); // returns array with keys 'count' and 'max'
     $channelData['all']['views'] = $viewsData['count'];
     $channelData['all']['maxViews'] = $viewsData['max'];
+    $channelData['all']['avgViews'] = round($channelData['all']['views']/$channelData['all']['count']);
     $channelData['cc']['count'] = countCaptioned($videos,$numVideos);
     $channelData['cc']['duration'] = calcDuration($videos,$numVideos,'true');
-    if ($minViews > 0) { // TODO: Update this to use new filter variables
-      $highTrafficThreshold = $minViews;
-    }
-    else {
-      $highTrafficThreshold = $avgViews;
-    }
+    // "high traffic" is any video with views > the channel mean
+    $highTrafficThreshold = $channelData['all']['avgViews'];
     $channelData['highTraffic']['count'] = countHighTraffic($videos,$numVideos,$highTrafficThreshold);
     $channelData['highTraffic']['duration'] = calcDuration($videos,$numVideos,NULL,$highTrafficThreshold);
     $channelData['ccHighTraffic']['count'] = countCaptioned($videos,$numVideos,$highTrafficThreshold);
@@ -380,10 +377,10 @@ function showSummaryTableTop($report,$numChannels,$firstChannelName,$channelMeta
   echo '<th scope="col">Max Views</th>'."\n";
   if (!$filter) {
     // no reason to separate out high traffic videos if already filtering for high traffic
-    echo '<th scope="col"># Videos High Traffic</th>'."\n";
-    echo '<th scope="col"># Captioned High Traffic</th>'."\n";
-    echo '<th scope="col">% Captioned High Traffic</th>'."\n";
-    echo '<th scope="col"># '.ucfirst($timeUnit).' Captioned High Traffic</th>'."\n";
+    echo '<th scope="col"># Videos High Traffic<sup>*</sup></th>'."\n";
+    echo '<th scope="col"># Captioned High Traffic<sup>*</sup></th>'."\n";
+    echo '<th scope="col">% Captioned High Traffic<sup>*</sup></th>'."\n";
+    echo '<th scope="col"># '.ucfirst($timeUnit).' Captioned High Traffic<sup>*</sup></th>'."\n";
   }
   echo "</tr>\n";
   echo '</thead>'."\n";
@@ -400,7 +397,6 @@ function showSummaryTableRow($report,$rowNum,$numChannels,$channelId=NULL,$chann
 
   // calculate percentages and averages
   $pctCaptioned = round($channelData['cc']['count']/$channelData['all']['count'] * 100,1);
-  $avgViews = round($channelData['all']['views']/$channelData['all']['count']); // an integer, don't need precision
   if (!$filter) {
     // high traffic data is only included for non-filtered channels
     $pctCaptionedHighTraffic = round($channelData['ccHighTraffic']['count']/$channelData['highTraffic']['count'] * 100,1);
@@ -488,7 +484,7 @@ function showSummaryTableRow($report,$rowNum,$numChannels,$channelId=NULL,$chann
   echo '<td class="data">'.number_format($pctCaptioned,1)."%</td>\n";
   echo '<td class="data">'.formatDuration($channelData['all']['duration'],$timeUnit)."</td>\n";
   echo '<td class="data">'.formatDuration($channelData['cc']['duration'],$timeUnit)."</td>\n";
-  echo '<td class="data">'.number_format($avgViews)."</td>\n";
+  echo '<td class="data">'.number_format($channelData['all']['avgViews'])."</td>\n";
   echo '<td class="data">'.number_format($channelData['all']['maxViews'])."</td>\n";
   if (!$filter) {
     // high traffic data is only included for non-filtered channels
@@ -508,6 +504,9 @@ function showSummaryTableBottom() {
 
   echo "</tbody>\n";
   echo "</table>\n";
+
+  echo '<p class="footnote"><sup>*</sup> "High traffic" is any video with views ';
+  echo 'greater than the mean for that channel.</p>'."\n";
 }
 
 function showBottom() {
@@ -520,9 +519,8 @@ function showDetailsList($channelId,$channelMeta,$channelData,$timeUnit,$include
 
   // show a list of summary data for channel, in conjunction with the video details table
 
-  // calculate percentages and averages
+  // calculate percentages
   $pctCaptioned = round($channelData['cc']['count']/$channelData['all']['count'] * 100,1);
-  $avgViews = round($channelData['all']['views']/$channelData['all']['count']); // an integer, don't need precision
 
   echo '<ul class="channelDetails">'."\n";
   // link to YouTube channel
@@ -554,8 +552,8 @@ function showDetailsList($channelId,$channelMeta,$channelData,$timeUnit,$include
   echo '<li>'.ucfirst($timeUnit).' captioned: <span class="value">';
   echo formatDuration($channelData['cc']['duration'],$timeUnit)."</span></td>\n";
 
-  // Average views
-  echo '<li>Average views: <span class="value">'.number_format($avgViews)."</span></li>\n";
+  // Average & max views
+  echo '<li>Average views: <span class="value">'.number_format($channelData['all']['avgViews'])."</span></li>\n";
   echo '<li>Max views: <span class="value">'.number_format($channelData['all']['maxViews'])."</span></li>\n";
 
   if (!$filter) {

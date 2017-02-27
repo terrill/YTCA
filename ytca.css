@@ -85,7 +85,8 @@ p.filterSettings span.filterValue {
   color: #c00;
 }
 p.footnote {
-  margin-left: 2em;
+  margin-left: 1em;
+  color: #333;
 }
 p.runTime {
   margin: 1em;
