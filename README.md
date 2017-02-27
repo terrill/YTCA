@@ -16,19 +16,51 @@ Data Collected for each YouTube Channel
 * Number of "high traffic" videos (see High Traffic section below for details)
 * Number of high traffic videos that are captioned 
 * Percent of high traffic videos that are captioned
-* Total duration of uncaptioned videos 
-* Total duration of uncaptioned high traffic videos 
+* Total duration of captioned videos 
+* Total duration of captioned high traffic videos 
 
 High Traffic Videos
 -------------------
 
-In order to prioritize captioning efforts, it can be focus on videos that are "high traffic". 
+In order to prioritize captioning efforts, one may wish to focus on videos that are "high traffic". 
 By default, YTCA considers a video "high traffic" if its number of views is greater than the 
 mean for that channel. 
 
-Alternatively, you can define your own high traffic threshold using the designated 
-variable in the Configuration block within [ytca.php][]. If this variable is greater than 0, 
-YTCA uses that as the high traffic threshold instead of the mean number of views.  
+Alternatively, you can define your own high traffic threshold using filters. 
+See the following section for details. 
+
+Filters
+-------------------
+Filters can be used to narrow the output to "high traffic" videos, defined in various of ways 
+using the *filtertype* and *filtervalue* parameters, which can be passed to YTCA via the URL. 
+Alternatively default filter settings can be defined in the Configuration block within [ytca.php][].
+
+Supported values of *filtertype* are: 
+
+* views - limit results to videos that have X or more views
+* percentile - limit results to videos that fall into the X percentile for the channel based on views (e.g., the top 10%)
+* count - limit results to the top X videos for the channel, based on views
+
+A *filtertype* parameter must always be accompanied by a a *filtervalue* parameter, which defines the value of X as used 
+by the filter. 
+
+In the following example, videos are limited to those with views greater than 10,000: 
+
+**ytca.php?filtertype=count&filtervalue=10000**
+
+URL Parameters
+-------------------
+YTCA supports the following parameters, which can be passed by URL or made permanent as default values 
+in the Configuration block within [ytca.php][]. 
+
+* **report** - supported values are 'summary' (default; shows summary statistics for all channels) or 'details' (shows statistics for individual videos)
+* **channels** - path to an ini file that identifies all YouTube channels to be included in the analysis. See [channels.ini][] for an example.  
+* **channelid** - id of a single YouTube channel. If this parameter is passed, the specified channel will be analyzed instead of channels in the ini file. 
+* **filtertype** - supported values are 'views', 'percentile', or 'count'. See the preceding section for details. 
+* **filtervalue** - the value associated with the chosen filter type. See the preceding section for details. 
+* **timeunit** - the unit in which "duration" values are reported. Supported values are 'seconds' (the default), 'minutes', or 'hours'
+* **title** - title of the report. Must be URL-encoded. For example, spaces must be replaced with plus signs (+) and other special characters must be replaced with their UTF-8 codes. See [W3Schools URL Encoding Reference][] for details, including a UTF-8 conversion chart.  
+
 
 Requirements
 ------------
@@ -41,15 +73,14 @@ Instructions
 ------------
 
 1. Define variables in the Configuration block within [ytca.php][].  
-2. Run it. 
-3. Each channel will be processed individually. After each channel is processed, click the green button at the bottom of the page to proceed with the next channel. 
-
-Additional documentation is provided within the comments in [ytca.php][]. 
+2. Run it in a browser. Use the URL parameters listed above to fine-tune the output and explore the data.  
 
 YouTube Channel IDs
 -------------------
 
-The Configuration block includes an array of YouTube Channel IDs. 
+YouTube channels can be analyzed one channel at a time by passing a **channelid** parameter via the URL. 
+Multiple channels can be analyzed in a batch by defining them in an ini file such as [channels.ini][]. 
+
 The YouTube Channel ID is a 24-character string that starts with the characters "UC". 
 This sometimes appears in the URL for the channel. 
 For example, the URL for the main University of Washington channel is 
@@ -65,7 +96,7 @@ find the channel ID for that channel:
 2. Search the source code for the attribute *data-channel-external-id*
 3. The value of that attribute is the channel ID 
 
-Alternatively, you can substitute the *user name* for any channel ID in the YTCA Configuration block.
+Alternatively, you can substitute the *user name* for any channel ID.
 As long as it's a valid user name and is not a 24-character string starting with "UC", 
 YTCA can look up the channel ID without you having to follow the above steps. 
 
@@ -75,8 +106,13 @@ For example, here's an alternative URL for accessing the main University of Wash
  
 The user name is **uwhuskies** 
 
-In the YTCA Configuration block we can enter either **uwhuskies** or **UCJgq3uJ5jFCbNB06TC9BFBw** 
-as the channel ID; both work just fine, although the former adds overhead because YTCA needs to 
+YTCA could analyze this one channel using either of the following URLs: 
+
+**ytca.php?channelid=uwhuskies** 
+
+**ytca.php?channelid=UCJgq3uJ5jFCbNB06TC9BFBw** 
+
+Both of these URLs generate the same output, but the former adds overhead because YTCA needs to 
 lookup each unknown channel ID via an extra query to the YouTube Data API.  
 
 Output
@@ -86,8 +122,9 @@ By default, the output from YTCA is one HTML file containing a table of statisti
 Each row within the table contains summary data for one YouTube channel,  
 and summary statistics are provided in a summary row at the bottom of the table. 
  
-Alternatively, you could customize YTCA by saving the data collected to a database, 
-then perform subsequent analyses on the data. 
+If **report=details** is passed via the URL, the output contains a separate table 
+for each channel, showing the title, number of views, and duration of each video in the channel, 
+plus a Yes/No field showing whether each video is captioned. 
 
 About Quotas
 ------------
@@ -109,4 +146,6 @@ to collect data from 100 channels (10,000 units) containing 998,000 videos.
 [YouTube Data API Reference]: https://developers.google.com/youtube/v3/docs/
 [Quota Usage]: https://developers.google.com/youtube/v3/getting-started#quota
 [Quota Calculator]: https://developers.google.com/youtube/v3/determine_quota_cost
+[W3Schools URL Encoding Reference]: https://www.w3schools.com/tags/ref_urlencode.asp
+[channels.ini]: channels.ini
 [ytca.php]: ytca.php
