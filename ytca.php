@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.5
+ * version 1.0.7
  *
  */
 
@@ -20,7 +20,7 @@ $apiKeyFile = 'apikey'; // name of local file in which API key is stored
 $channelsFile = 'channels.ini';
 
 // Output (can be overwritten with parameter 'output' in URL)
-// Supported values: html, xml, json
+// Supported values: html, xml, json (EVENTUALLY; xml and json are not yet supported)
 $output = 'html';
 
 // Report (can be overwritten with parameter 'report' in URL)
@@ -222,7 +222,6 @@ if ($numChannels > 0) {
     else {
       // TODO: handle error: Unable to retrieve file: $channelQuery
     }
-
     if ($filter) {
       $videos = applyFilter($channels[$c]['videos'],$filter);
     }
@@ -230,23 +229,23 @@ if ($numChannels > 0) {
       $videos = $channels[$c]['videos'];
     }
     $numVideos = sizeof($videos);
-
     // add values to channel totals
     $channelData['all']['count'] = $numVideos;
     $channelData['all']['duration'] = calcDuration($videos,$numVideos);
     $viewsData = countViews($videos,$numVideos); // returns array with keys 'count' and 'max'
     $channelData['all']['views'] = $viewsData['count'];
     $channelData['all']['maxViews'] = $viewsData['max'];
-    $channelData['all']['avgViews'] = round($channelData['all']['views']/$channelData['all']['count']);
     $channelData['cc']['count'] = countCaptioned($videos,$numVideos);
     $channelData['cc']['duration'] = calcDuration($videos,$numVideos,'true');
-    // "high traffic" is any video with views > the channel mean
-    $highTrafficThreshold = $channelData['all']['avgViews'];
-    $channelData['highTraffic']['count'] = countHighTraffic($videos,$numVideos,$highTrafficThreshold);
-    $channelData['highTraffic']['duration'] = calcDuration($videos,$numVideos,NULL,$highTrafficThreshold);
-    $channelData['ccHighTraffic']['count'] = countCaptioned($videos,$numVideos,$highTrafficThreshold);
-    $channelData['ccHighTraffic']['duration'] = calcDuration($videos,$numVideos,'true',$highTrafficThreshold);
-
+    if (!$filter) {
+      // no reason to separate out high traffic videos if already filtering for high traffic
+      $channelData['all']['avgViews'] = round($channelData['all']['views']/$channelData['all']['count']);
+      $highTrafficThreshold = $channelData['all']['avgViews'];
+      $channelData['highTraffic']['count'] = countHighTraffic($videos,$numVideos,$highTrafficThreshold);
+      $channelData['highTraffic']['duration'] = calcDuration($videos,$numVideos,NULL,$highTrafficThreshold);
+      $channelData['ccHighTraffic']['count'] = countCaptioned($videos,$numVideos,$highTrafficThreshold);
+      $channelData['ccHighTraffic']['duration'] = calcDuration($videos,$numVideos,'true',$highTrafficThreshold);
+    }
     $rowNum = $c + 1;
     if ($rowNum < $numChannels) {
       $nextChannelName = $channels[$rowNum]['name'];
@@ -541,7 +540,7 @@ function showDetailsList($channelId,$channelMeta,$channelData,$timeUnit,$include
 
   // Number / percent captioned
   echo '<li>Number captioned: <span class="value">';
-  number_format($channelData['cc']['count']).'</span> ';
+  echo number_format($channelData['cc']['count']).'</span> ';
   echo '(<span class="value">'.number_format($pctCaptioned,1).'%</span>)</li>'."\n";
 
   // Duration
@@ -552,12 +551,9 @@ function showDetailsList($channelId,$channelMeta,$channelData,$timeUnit,$include
   echo '<li>'.ucfirst($timeUnit).' captioned: <span class="value">';
   echo formatDuration($channelData['cc']['duration'],$timeUnit)."</span></td>\n";
 
-  // Average & max views
-  echo '<li>Average views: <span class="value">'.number_format($channelData['all']['avgViews'])."</span></li>\n";
-  echo '<li>Max views: <span class="value">'.number_format($channelData['all']['maxViews'])."</span></li>\n";
-
   if (!$filter) {
     // high traffic data is only included for non-filtered channels
+    echo '<li>Average views: <span class="value">'.number_format($channelData['all']['avgViews'])."</span></li>\n";
     echo '<li>Number of high traffic videos: <span class="value">';
     echo number_format($channelData['highTraffic']['count'])."</span></li>\n";
     echo '<li>Number captioned (high traffic): <span class="value">';
@@ -591,13 +587,12 @@ function showDetailsTable($videos,$numVideos) {
     ob_flush();
     flush();
 
-    // sort videos by views DESC
-    sortVideosByViews($videos,SORT_DESC);
+    // videos are already sorted by views DESC via applyFilter()
 
     $i=0;
     while ($i < $numVideos) {
       echo '<tr>'."\n";
-      echo '<td>'.$videos[$i]['title']."</td>\n";
+      echo '<td><a href="https://youtu.be/'.$videos[$i]['id'].'">'.$videos[$i]['title']."</a></td>\n";
       echo '<td>'.convertToHMS($videos[$i]['duration'])."</td>\n";
       if ($videos[$i]['captions'] == 'true') {
         echo '<td class="ccYes">Yes</td>'."\n";
@@ -605,7 +600,7 @@ function showDetailsTable($videos,$numVideos) {
       elseif ($videos[$i]['captions'] == 'false') {
         echo '<td class="ccNo">No</td>'."\n";
       }
-      echo '<td>'.$videos[$i]['views']."</td>\n";
+      echo '<td>'.number_format($videos[$i]['views'])."</td>\n";
       echo "</tr>\n";
       ob_flush();
       flush();
@@ -876,10 +871,12 @@ function applyFilter($videos,$filter) {
   }
   elseif ($filter['type'] == 'percentile') {
     // include only videos in the Xth percentile (based on views)
-    $videos = sortVideosByViews($videos,SORT_ASC);
+    $videos = sortVideosByViews($videos,SORT_DESC);
+    // videos are sorted DESC (not ASC) because that's how we want to display them in the output
     $percentile = $filter['value'];
-    $i = ($percentile/100) * $numVideos; // this is the starting index for the target percentile
-    while ($i < $numVideos) {
+    $targetIndex = floor(($percentile/100) * $numVideos);
+    $i = 0;
+    while ($i <= $targetIndex) {
       $v[] = $videos[$i];
       $i++;
     }
@@ -1013,9 +1010,11 @@ function convertToHMS($duration) {
   // see comments above about $duration dormat
   // convert to HH:MM:SS
   $interval = new DateInterval($duration);
-  return ($interval->h*3600)+($interval->i*60)+($interval->s);
+  $hours = sprintf("%02d",$interval->h);
+  $minutes = sprintf("%02d",$interval->i);
+  $seconds = sprintf("%02d",$interval->s);
+  return $hours.':'.$minutes.':'.$seconds;
 }
-
 
 function makeTimeReadable($seconds) {
 
