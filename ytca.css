@@ -66,6 +66,37 @@ ul.channelDetails li span.value {
 
 /*
  *
+ * Debug styles
+ *
+ */
+div.ytca_debug {
+  display: block;
+  margin: 0.75em 1em;
+  border: 1px solid black;
+  padding: 1em;
+  max-width: 40em;
+  background-color: #EEE;
+}
+div.ytca_channel_query {
+  background-color: #FFC;
+}
+div.ytca_debug span {
+  display: block;
+}
+div.ytca_debug span.query_label {
+  font-weight: bold;
+}
+div.ytca_debug span a {
+  text-decoration: none;
+  color: #333;
+}
+div.ytca_debug span a:hover,
+div.ytca_debug span a:focus {
+  text-decoration: underline;
+}
+
+/*
+ *
  * Misc styles
  *
  */

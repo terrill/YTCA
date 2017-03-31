@@ -60,6 +60,7 @@ in the Configuration block within [ytca.php][].
 * **filtervalue** - the value associated with the chosen filter type. See the preceding section for details. 
 * **timeunit** - the unit in which "duration" values are reported. Supported values are 'seconds' (the default), 'minutes', or 'hours'
 * **title** - title of the report. Must be URL-encoded. For example, spaces must be replaced with plus signs (+) and other special characters must be replaced with their UTF-8 codes. See [W3Schools URL Encoding Reference][] for details, including a UTF-8 conversion chart.  
+* **debug** - supported values are 'true' or 'false'. If true, includes URLs of all YouTube queries in the output so users can inspect the query and the raw data returned from YouTube in response. 
 
 
 Requirements

@@ -16,6 +16,11 @@
 // Store API key in a local file
 $apiKeyFile = 'apikey'; // name of local file in which API key is stored
 
+// Debug (can be overwritten with parameter 'debug' in URL)
+// Value is either true or false
+// If true, includes YouTube API query URLs in output so user can inspect raw data directly
+$debug = false;
+
 // Path to channels ini file (can be overwritten with parameter 'channels' in URL)
 $channelsFile = 'channels.ini';
 
@@ -86,6 +91,12 @@ $timeStart = microtime(true);
 $apiKey = file_get_contents($apiKeyFile);
 
 // Override default variables with GET params
+if (isset($_GET['debug'])) {
+  // convert to boolean; accept 'true', 'false' or 1 or 0
+  if (strtolower($_GET['debug']) == 'true' || $_GET['debug'] == '1') {
+    $debug = true;
+  }
+}
 if (isset($_GET['output'])) {
   if (isValid('output',strtolower($_GET['output']))) {
     $output = strtolower($_GET['output']);
@@ -191,7 +202,6 @@ if ($numChannels > 0) {
       }
     }
     $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],$apiKey);
-
     // create an array of metadata for this channel (if any exists)
     $numKeys = sizeof($channels[$c]);
     if ($numKeys > 2) {
@@ -206,14 +216,19 @@ if ($numChannels > 0) {
         $i++;
       }
     }
-
+    if ($debug) {
+      echo '<div class="ytca_debug ytca_channel_query">';
+      echo '<span class="query_label">Initial channel query:</span>'."\n";
+      echo '<span class="query_url"><a href="'.$channelQuery.'">'.$channelQuery."</a></span>\n";
+      echo "</div>\n";
+    }
     if ($content = fileGetContents($channelQuery)) {
       $json = json_decode($content,true);
       $numVideos = $json['pageInfo']['totalResults'];
       $channel['videoCount'] = $numVideos;
       if ($numVideos > 0) {
         // add a 'videos' key for this channel that point to all videos
-        $channels[$c]['videos'] = getVideos($channelId,$json,$numVideos,$apiKey);
+        $channels[$c]['videos'] = getVideos($channelId,$json,$numVideos,$apiKey,$debug);
       }
       else {
         // TODO: handle error: No videos returned by $channelQuery
@@ -788,7 +803,7 @@ function buildYouTubeQuery($which, $id, $apiKey, $nextPageToken=NULL) {
   return $request;
 }
 
-function getVideos($channelId,$json,$numVideos,$apiKey) {
+function getVideos($channelId,$json,$numVideos,$apiKey,$debug) {
 
   $maxResults = 50; // as defined by YouTube API
   if ($numVideos <= $maxResults) {
@@ -819,6 +834,12 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
       // Therefore we need to refresh $json with the next page of data
       $nextPageToken = $json['nextPageToken'];
       $channelQuery = buildYouTubeQuery('search',$channelId,$apiKey,$nextPageToken);
+      if ($debug) {
+        echo '<div class="ytca_debug ytca_channel_query">';
+        echo '<span class="query_label">Channel query #'.$q.' of '.$numQueries.':</span>'."\n";
+        echo '<span class="query_url"><a href="'.$channelQuery.'">'.$channelQuery."</a></span>\n";
+        echo "</div>\n";
+      }
       if ($content = fileGetContents($channelQuery)) {
         $json = json_decode($content,true);
       }
@@ -831,6 +852,12 @@ function getVideos($channelId,$json,$numVideos,$apiKey) {
       if ($videoId) {
       // get details about this video via a 'videos' query
         $videoQuery = buildYouTubeQuery('videos', $videoId, $apiKey);
+        if ($debug) {
+          echo '<div class="ytca_debug">';
+          echo '<span class="query_label">Video query #'.$i.' of '.$finalIndex.':</span>'."\n";
+          echo '<span class="query_url"><a href="'.$videoQuery.'">'.$videoQuery."</a></span>\n";
+          echo "</div>\n";
+        }
         if ($videoContent = fileGetContents($videoQuery)) {
           $videos[$v]['id'] = $videoId;
           $videos[$v]['title'] = $json['items'][$i]['snippet']['title'];
