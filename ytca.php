@@ -228,7 +228,7 @@ if ($numChannels > 0) {
       $channel['videoCount'] = $numVideos;
       if ($numVideos > 0) {
         // add a 'videos' key for this channel that point to all videos
-        $channels[$c]['videos'] = getVideos($channelId,$json,$numVideos,$apiKey,$debug);
+        $channels[$c]['videos'] = getVideos($channels[$c]['id'],$json,$numVideos,$apiKey,$debug);
       }
       else {
         // TODO: handle error: No videos returned by $channelQuery
