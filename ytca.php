@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.10
+ * version 1.0.11
  *
  */
 
@@ -884,6 +884,7 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
       echo '<thead>'."\n";
       echo '<tr>'."\n";
       echo '<th scope="col">Video Title</th>'."\n";
+      echo '<th scope="col">Date</th>'."\n";
       echo '<th scope="col">Duration</th>'."\n";
       echo '<th scope="col">Captioned</th>'."\n";
       echo '<th scope="col">Views</th>'."\n";
@@ -909,6 +910,7 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
         // show table row
         echo '<tr>'."\n";
         echo '<td><a href="https://youtu.be/'.$videos[$i]['id'].'">'.$videos[$i]['title']."</a></td>\n";
+        echo '<td>'.$videos[$i]['date']."</td>\n";
         echo '<td>'.convertToHMS($videos[$i]['duration'])."</td>\n";
         if ($videos[$i]['captions'] == 'true') {
           echo '<td class="ccYes">Yes</td>'."\n";
@@ -923,6 +925,7 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
         echo '<video>'."\n";
         echo '<youtube_id>'.$videos[$i]['id']."</youtube_id>\n";
         echo '<title>'.htmlspecialchars($videos[$i]['title'], ENT_XML1, 'UTF-8')."</title>\n";
+        echo '<date>'.$videos[$i]['date']."</date>\n";
         echo '<duration>'.convertToHMS($videos[$i]['duration'])."</duration>\n";
         if ($videos[$i]['captions'] == 'true') {
           echo '<captioned>Yes</captioned>'."\n";
@@ -937,6 +940,7 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
         echo "{\n"; // open video array
         echo '"youtube_id": "'.$videos[$i]['id'].'",'."\n";
         echo '"title": "'.htmlspecialchars($videos[$i]['title'], ENT_XML1, 'UTF-8').'",'."\n";
+        echo '"date": "'.$videos[$i]['date'].'",'."\n";
         echo '"duration": "'.convertToHMS($videos[$i]['duration']).'",'."\n";
         if ($videos[$i]['captions'] == 'true') {
           echo '"captioned": "Yes",'."\n";
@@ -1219,6 +1223,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey,$debug) {
         if ($videoContent = fileGetContents($videoQuery)) {
           $videos[$v]['id'] = $videoId;
           $videos[$v]['title'] = $json['items'][$i]['snippet']['title'];
+          $videos[$v]['date'] = formatDate('youtube','ymd',$json['items'][$i]['snippet']['publishedAt']);
           $videoJson = json_decode($videoContent,true);
           $videos[$v]['duration'] = $videoJson['items'][0]['contentDetails']['duration']; // in seconds
           $videos[$v]['captions'] = $videoJson['items'][0]['contentDetails']['caption']; // 'true' or 'false'
@@ -1437,6 +1442,23 @@ function formatDuration($seconds, $timeUnit) {
   elseif ($timeUnit == 'hours') {
     return number_format(($seconds / 3600), 2);
   }
+}
+
+function formatDate($from,$to,$date) {
+
+  // $from is either 'youtube' (e.g., "2016-04-12T16:26:51.000Z")
+  // or 'ymd' (e.g., "2016-04-12")
+  // $to is either 'ymd' or 'friendly' (e.g., 'Apr 12, 2016')
+
+  $ts = strtotime($date);
+
+  if ($to == 'ymd') {
+    return date('Y-m-d', $ts);
+  }
+  elseif ($to == 'friendly') {
+    return date('M d, Y', $ts);
+  }
+  return false;
 }
 
 function countCaptioned($videos,$numVideos,$viewThreshold=NULL) {
