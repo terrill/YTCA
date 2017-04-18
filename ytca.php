@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.9
+ * version 1.0.10
  *
  */
 
@@ -57,8 +57,8 @@ $settings['title'] = 'YouTube Caption Auditor (YTCA) Report';
 $settings['timeUnit'] = 'seconds';
 
 // Include Channel ID
-// Set to true to include a YouTube Channel ID column in the output; otherwise false
-$includeChannelId = false;
+// Set to true to include a YouTube Channel ID column in the HTML output of summary report; otherwise false
+$settings['showChannelId'] = false;
 
 // Highlights
 // Optionally, the report can highlight channels that are either doing good or bad at captioning
@@ -127,6 +127,13 @@ if (isset($_GET['channels'])) {
     $settings['channelsFile'] = urldecode(strip_tags($_GET['channels']));
   }
 }
+if (isset($_GET['show-channel-id'])) {
+  // convert to boolean; accept 'true', 'false' or 1 or 0
+  if (strtolower($_GET['show-channel-id']) == 'true' || $_GET['show-channel-id'] == '1') {
+    $settings['showChannelId'] = true;
+  }
+}
+
 
 showTop($settings,$highlights['goodColor'],$highlights['badColor'],$filter);
 
@@ -187,7 +194,7 @@ if ($numChannels > 0) {
   if ($settings['output'] == 'html') {
     if ($settings['report'] == 'summary') {
       $firstChannelName = $channels[0]['name'];
-      showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMeta,$includeChannelId,$filter);
+      showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMeta,$filter);
     }
   }
   elseif ($settings['output'] == 'xml') {
@@ -271,10 +278,10 @@ if ($numChannels > 0) {
 
     if ($settings['report'] == 'details') {
       // show details for this channel
-      showDetails($settings,$rowNum,$numChannels,$channels[$c],$channelMeta[$c],$channelData,$videos,$numVideos,$includeChannelId,$filter);
+      showDetails($settings,$rowNum,$numChannels,$channels[$c],$channelMeta[$c],$channelData,$videos,$numVideos,$filter);
     }
     else { // show a summary report
-      showSummaryTableRow($settings,$rowNum,$numChannels,$channels[$c],$nextChannelName,$channelMeta[$c],$channelData,$includeChannelId,$filter,$highlights);
+      showSummaryTableRow($settings,$rowNum,$numChannels,$channels[$c],$nextChannelName,$channelMeta[$c],$channelData,$filter,$highlights);
 
       // increment totals with values from this channel
       $totals['all']['count'] += $channelData['all']['count'];
@@ -298,7 +305,7 @@ if ($numChannels > 0) {
 
   if ($settings['report'] == 'summary') {
     // add totals row
-    showSummaryTableRow($settings,'totals',$numChannels,NULL,NULL,$channelMeta[0],$totals,$includeChannelId,$filter);
+    showSummaryTableRow($settings,'totals',$numChannels,NULL,NULL,$channelMeta[0],$totals,$filter);
     showSummaryTableBottom($settings['output']);
   }
 }
@@ -371,7 +378,7 @@ function showTop($settings,$goodColor,$badColor,$filter=NULL) {
   }
 }
 
-function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMeta,$includeChannelId,$filter) {
+function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMeta,$filter) {
 
   // $metaData is an array of 'keys' and 'values' for each channel; or false
 
@@ -387,7 +394,7 @@ function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMe
     echo '>'."\n";
     echo '<th scope="col">ID</th>'."\n";
     echo '<th scope="col">YouTube Channel</th>'."\n";
-    if ($includeChannelId) {
+    if ($settings['showChannelId']) {
       echo '<th scope="col">YouTube ID</th>'."\n";
     }
     if ($channelMeta) {
@@ -467,7 +474,7 @@ function addMetaTags($output,$settings,$filter) {
   }
 }
 
-function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextChannelName=NULL,$metaData=NULL,$channelData,$includeChannelId,$filter,$highlights=NULL) {
+function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextChannelName=NULL,$metaData=NULL,$channelData,$filter,$highlights=NULL) {
 
   // $rowNum is either an integer, or 'totals'
   // $channel, $metaData, and $channelData are all arrays
@@ -498,7 +505,7 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
       echo ' class="totals" data-numMeta="'.$numMeta.'" >';
       // calculate colspan for Totals row header
       // always span ID and Name columns
-      if ($includeChannelId) { // span that too, plus all metadata columns
+      if ($settings['showChannelId']) { // span that too, plus all metadata columns
         $colSpan = $numMeta + 3;
       }
       else { // span all metadata columns
@@ -568,7 +575,7 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
 
   // channelId
   if ($rowNum !== 'totals') {
-    if ($includeChannelId) {
+    if ($settings['showChannelId']) {
       if ($settings['output'] == 'html') {
         echo '<td>'.$channel['id']."</td>\n";
       }
@@ -749,7 +756,7 @@ function showBottom($output) {
   }
 }
 
-function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$channelData,$videos,$numVideos,$includeChannelId,$filter) {
+function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$channelData,$videos,$numVideos,$filter) {
 
   // $channel is an array that includes 'id', 'name', plus 'videos' (an array of *unfiltered* videos)
   // $channelMeta is an array of metadata fields and their values for this channel
@@ -769,7 +776,7 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
 
     echo '<ul class="channelDetails">'."\n";
     // link to YouTube channel
-    if ($includeChannelId) {
+    if ($settings['showChannelId']) {
       $channelLink = 'https://www.youtube.com/channel/'.$channelId;
       echo '<li><a href="'.$channelLink.'">'.$channelLink.'</a></li>'."\n";
     }
