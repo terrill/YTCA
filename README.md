@@ -48,6 +48,22 @@ In the following example, videos are limited to those with views greater than 10
 
 **ytca.php?filtertype=count&filtervalue=10000**
 
+
+Filtering by Date
+-------------------
+
+YTCA can limit results to just those videos published within a particular date range. 
+The *date-start* and *date-end* parameters can be used independently or together. 
+
+In the following example, videos are limited to those published on or after January 1, 2016: 
+
+**ytca.php?date-start=2016-01-01**
+
+In the following example, videos are limited to those published between January 1, 2016 and June 30, 2016: 
+
+**ytca.php?date-start=2016-01-01&date-end=2016-06-30**
+
+
 URL Parameters
 -------------------
 YTCA supports the following parameters, which can be passed by URL or made permanent as default values 
@@ -58,6 +74,8 @@ in the Configuration block within [ytca.php][].
 * **channelid** - id of a single YouTube channel. If this parameter is passed, the specified channel will be analyzed instead of channels in the ini file. 
 * **filtertype** - supported values are 'views', 'percentile', or 'count'. See the preceding section for details. 
 * **filtervalue** - the value associated with the chosen filter type. See the preceding section for details. 
+* **date-start** - limit results to videos published on or after this date (values must be in the form YYYY-MM-DD, e.g., 2016-01-01)
+* **date-end** - limit results to videos published on or before this date 
 * **timeunit** - the unit in which "duration" values are reported. Supported values are 'seconds' (the default), 'minutes', or 'hours'
 * **title** - title of the report. Must be URL-encoded. For example, spaces must be replaced with plus signs (+) and other special characters must be replaced with their UTF-8 codes. See [W3Schools URL Encoding Reference][] for details, including a UTF-8 conversion chart.  
 * **show-channel-id** - supported values are 'true' or 'false'. If true, a YouTube Channel ID column is included in the HTML output of summary report. Default is 'false'.

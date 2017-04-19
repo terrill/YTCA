@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.11
+ * version 1.0.12
  *
  */
 
@@ -110,6 +110,16 @@ if (isset($_GET['filtertype']) && isset($_GET['filtervalue'])) {
       $filter['type'] = strtolower($_GET['filtertype']);
       $filter['value'] = $_GET['filtervalue'];
     }
+  }
+}
+if (isset($_GET['date-start'])) {
+  if (isValid('date',$_GET['date-start'])) {
+    $filter['dateStart'] = $_GET['date-start'];
+  }
+}
+if (isset($_GET['date-end'])) {
+  if (isValid('date',$_GET['date-end'])) {
+    $filter['dateEnd'] = $_GET['date-end'];
   }
 }
 if (isset($_GET['title'])) {
@@ -349,19 +359,44 @@ function showTop($settings,$goodColor,$badColor,$filter=NULL) {
     if ($filter) {
       echo '<p class="filterSettings">';
       echo 'Filter on. Including only ';
+      $needAnd = false;
       if ($filter['type'] == 'views') {
-        echo 'videos with <span class="filterValue">'.$filter['value'].'</span> views.';
+        echo 'videos with <span class="filterValue">'.$filter['value'].'</span> views';
+        $needAnd = true;
       }
       elseif ($filter['type'] == 'percentile') {
         echo 'videos in the <span class="filterValue">';
         echo $filter['value'].getOrdinalSuffix($filter['value']);
-        echo '</span> percentile for each channel.';
+        echo '</span> percentile for each channel';
+        $needAnd = true;
       }
       elseif ($filter['type'] == 'count') {
         echo 'the top <span class="filterValue">'.$filter['value'].'</span> videos in each channel ';
         echo '(based on views)';
+        $needAnd = true;
       }
-      echo "</p>\n";
+      if ($filter['dateStart'] || $filter['dateEnd']) {
+        if ($needAnd) {
+          echo ' and published ';
+        }
+        else {
+          echo 'videos published ';
+        }
+        if ($filter['dateStart'] && $filter['dateEnd']) {
+          echo 'between ';
+          echo '<span class="filterValue">'.$filter['dateStart'].'</span> and ';
+          echo '<span class="filterValue">'.$filter['dateEnd'].'</span>';
+        }
+        elseif ($filter['dateStart']) {
+          echo 'on or after ';
+          echo '<span class="filterValue">'.$filter['dateStart'].'</span>';
+        }
+        elseif ($filter['dateEnd']) {
+          echo 'on or before ';
+          echo '<span class="filterValue">'.$filter['dateEnd'].'</span>';
+        }
+      }
+      echo ".</p>\n";
     }
   }
   elseif ($settings['output'] == 'xml') {
@@ -1019,6 +1054,14 @@ function isValid($var, $value, $filterType=NULL) {
     // For example, could check to see if title is properly URL-encoded
     return true;
   }
+  elseif ($var == 'date') {
+    if (strlen($value) == 10) { // fuck - add more to this
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
   else {
     if ($var == 'output') {
       $allowed = array('html','xml','json');
@@ -1257,7 +1300,6 @@ function applyFilter($videos,$filter) {
       }
       $i++;
     }
-    return $v;
   }
   elseif ($filter['type'] == 'percentile') {
     // include only videos in the Xth percentile (based on views)
@@ -1270,7 +1312,6 @@ function applyFilter($videos,$filter) {
       $v[] = $videos[$i];
       $i++;
     }
-    return $v;
   }
   elseif ($filter['type'] == 'count') {
     // include only videos in the Top X (based on views)
@@ -1281,13 +1322,51 @@ function applyFilter($videos,$filter) {
         $v[] = $videos[$i];
         $i++;
       }
-      return $v;
     }
     else {
       // there are fewer than X videos in this channel.
       // Return all videos
-      return $videos;
+      $v = $vidoes;
     }
+  }
+  else {
+    // there is no filter
+    $v = $videos;
+  }
+  if ($filter['dateStart'] || $filter['dateEnd']) {
+    $v = filterByDate($v,$filter);
+  }
+  return $v;
+}
+
+function filterBydate($videos,$filter) {
+
+  $numVideos = sizeof($videos);
+  if ($numVideos > 0) {
+    if (!$filter['type']) {
+      // date is the only filter; therefore sort output by date
+      $videos = sortVideosByDate($videos,SORT_DESC);
+    }
+    $i = 0;
+    while ($i <= $numVideos) {
+      if ($filter['dateStart'] && $filter['dateEnd']) {
+        if ($videos[$i]['date'] >= $filter['dateStart'] && $videos[$i]['date'] <= $filter['dateEnd']) {
+          $v[] = $videos[$i];
+        }
+      }
+      elseif ($filter['dateStart']) {
+        if ($videos[$i]['date'] >= $filter['dateStart']) {
+          $v[] = $videos[$i];
+        }
+      }
+      elseif ($filter['dateEnd']) {
+        if ($videos[$i]['date'] <= $filter['dateEnd']) {
+          $v[] = $videos[$i];
+        }
+      }
+      $i++;
+    }
+    return $v;
   }
 }
 
@@ -1299,6 +1378,17 @@ function sortVideosByViews($videos,$sort) {
     $views[$key] = $row['views'];
   }
   array_multisort($views, $sort, $videos);
+  return $videos;
+}
+
+function sortVideosByDate($videos,$sort) {
+
+  // return $videos array sorted by date
+  // $sort is either SORT_ASC or SORT_DESC
+  foreach ($videos as $key=>$row) {
+    $videosByDate[$key] = $row['date'];
+  }
+  array_multisort($videosByDate, $sort, $videos);
   return $videos;
 }
 
