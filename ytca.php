@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.12
+ * version 1.0.13
  *
  */
 
@@ -1055,8 +1055,19 @@ function isValid($var, $value, $filterType=NULL) {
     return true;
   }
   elseif ($var == 'date') {
-    if (strlen($value) == 10) { // fuck - add more to this
-      return true;
+    // date-start and date-end must be in the format MMMM-YY-DD
+    if (strlen($value) == 10) {
+      $year = substr($value,0,4);
+      $month = ltrim(substr($value,5,2),'0');
+      $day = ltrim(substr($value,8,2),'0');
+      if ($year > 1800 && $year <= date('Y')) {
+        if ($month >=1 && $month <= 12) {
+          if ($day >= 1 && $day <= 31) {
+            return true;
+          }
+        }
+      }
+      return false;
     }
     else {
       return false;
