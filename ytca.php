@@ -339,7 +339,7 @@ function showTop($settings,$goodColor,$badColor,$filter=NULL) {
     echo "<!DOCTYPE html>\n";
     echo "<head>\n";
     echo '<title>'.$settings['title']."</title>\n";
-    echo '<link rel="stylesheet" type="text/css" href="ytca.css">'."\n";
+    echo '<link rel="stylesheet" type="text/css" href="styles/ytca.css">'."\n";
     echo '<style>'."\n";
     echo "tr.goodChannel th,\n";
     echo "tr.goodChannel td {\n";
@@ -356,7 +356,7 @@ function showTop($settings,$goodColor,$badColor,$filter=NULL) {
     echo '<p class="date">'.date('M d, Y')."</p>\n";
     echo '<div id="status" role="alert"></div>'."\n";
     echo '<script src="//ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>'."\n";
-    echo '<script src="ytca.js"></script>'."\n";
+    echo '<script src="scripts/ytca.js"></script>'."\n";
     if ($filter) {
       echo '<p class="filterSettings">';
       echo 'Filter on. Including only ';
