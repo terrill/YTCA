@@ -355,6 +355,7 @@ function showTop($settings,$goodColor,$badColor,$filter=NULL) {
     echo '<h1>'.$settings['title']."</h1>\n";
     echo '<p class="date">'.date('M d, Y')."</p>\n";
     echo '<div id="status" role="alert"></div>'."\n";
+    echo '<script src="//ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>'."\n";
     echo '<script src="ytca.js"></script>'."\n";
     if ($filter) {
       echo '<p class="filterSettings">';
