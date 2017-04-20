@@ -21,6 +21,7 @@ body {
  * Data tables
  *
  */
+
 table {
   border: 1px solid black;
   border-collapse: collapse;
@@ -30,7 +31,12 @@ th, td {
   padding: 1em;
 }
 th[scope="col"] {
+  padding: 1em 0;
   vertical-align: bottom;
+}
+th[scope="col"]:hover {
+  text-decoration: underline;
+  cursor: pointer;
 }
 td.data {
   text-align: right;
@@ -42,14 +48,27 @@ td a {
 tr.totals td {
   font-weight: bold;
 }
-table.videoDetails {
+table.details {
   margin-left: 1em;
 }
-table.videoDetails td.ccYes {
+table.details td.ccYes {
   color: #093;
 }
-table.videoDetails td.ccNo {
+table.details td.ccNo {
   color: #C00;
+}
+th[aria-sort="ascending"] span {
+  background-image: url('../images/sort_asc.png');
+}
+th[aria-sort="descending"] span {
+  background-image: url('../images/sort_desc.png');
+}
+th[aria-sort] span {
+ 	background-position: center right;
+	background-repeat: no-repeat;
+}
+th span {
+  padding: 0 25px; /* wide enough for sort arrow icon */
 }
 
 /*
@@ -57,6 +76,7 @@ table.videoDetails td.ccNo {
  * Report lists
  *
  */
+
 ul.channelDetails li {
   margin-bottom: 0.15em;
 }
@@ -69,6 +89,7 @@ ul.channelDetails li span.value {
  * Debug styles
  *
  */
+
 div.ytca_debug {
   display: block;
   margin: 0.75em 1em;
@@ -93,6 +114,22 @@ div.ytca_debug span a {
 div.ytca_debug span a:hover,
 div.ytca_debug span a:focus {
   text-decoration: underline;
+}
+
+/*
+ *
+ * Focus indicator
+ *
+ */
+
+*:focus {
+  border: 3px solid #78aed9 !important;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset, 0 0 8px rgba(102, 175, 233, 0.6) !important;
+  outline: 0 none !important;
+  text-decoration: none;
+}
+button::-moz-focus-inner {
+  border: 0;
 }
 
 /*

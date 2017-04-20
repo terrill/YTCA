@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.13
+ * version 1.0.14
  *
  */
 
@@ -104,22 +104,26 @@ if (isset($_GET['report'])) {
   }
 }
 $filter = false;
-if (isset($_GET['filtertype']) && isset($_GET['filtervalue'])) {
-  if (isValid('filterType',strtolower($_GET['filtertype']))) {
-    if (isValid('filterValue',$_GET['filtervalue'],strtolower($_GET['filtertype']))) {
-      $filter['type'] = strtolower($_GET['filtertype']);
-      $filter['value'] = $_GET['filtervalue'];
-    }
-  }
-}
+$sortBy = 'title'; // default, conditionally overridden
 if (isset($_GET['date-start'])) {
   if (isValid('date',$_GET['date-start'])) {
     $filter['dateStart'] = $_GET['date-start'];
+    $sortBy = 'date';
   }
 }
 if (isset($_GET['date-end'])) {
   if (isValid('date',$_GET['date-end'])) {
     $filter['dateEnd'] = $_GET['date-end'];
+    $sortBy = 'date';
+  }
+}
+if (isset($_GET['filtertype']) && isset($_GET['filtervalue'])) {
+  if (isValid('filterType',strtolower($_GET['filtertype']))) {
+    if (isValid('filterValue',$_GET['filtervalue'],strtolower($_GET['filtertype']))) {
+      $filter['type'] = strtolower($_GET['filtertype']);
+      $filter['value'] = $_GET['filtervalue'];
+      $sortBy = 'viewCount'; // takes precedence over date filter
+    }
   }
 }
 if (isset($_GET['title'])) {
@@ -221,7 +225,7 @@ if ($numChannels > 0) {
       // this is not a valid channel ID; must be a username
       $channels[$c]['id'] = getChannelId($apiKey,$channels[$c]['id']);
     }
-    $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],$apiKey);
+    $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],$apiKey,$sortBy);
     // create an array of metadata for this channel (if any exists)
     $numKeys = sizeof($channels[$c]);
     if ($numKeys > 2) {
@@ -248,7 +252,7 @@ if ($numChannels > 0) {
       $channel['videoCount'] = $numVideos;
       if ($numVideos > 0) {
         // add a 'videos' key for this channel that point to all videos
-        $channels[$c]['videos'] = getVideos($channels[$c]['id'],$json,$numVideos,$apiKey,$debug);
+        $channels[$c]['videos'] = getVideos($channels[$c]['id'],$json,$numVideos,$apiKey,$sortBy,$debug);
       }
       else {
         // TODO: handle error: No videos returned by $channelQuery
@@ -288,7 +292,7 @@ if ($numChannels > 0) {
 
     if ($settings['report'] == 'details') {
       // show details for this channel
-      showDetails($settings,$rowNum,$numChannels,$channels[$c],$channelMeta[$c],$channelData,$videos,$numVideos,$filter);
+      showDetails($settings,$rowNum,$numChannels,$channels[$c],$channelMeta[$c],$channelData,$videos,$numVideos,$filter,$sortBy);
     }
     else { // show a summary report
       showSummaryTableRow($settings,$rowNum,$numChannels,$channels[$c],$nextChannelName,$channelMeta[$c],$channelData,$filter,$highlights);
@@ -357,6 +361,7 @@ function showTop($settings,$goodColor,$badColor,$filter=NULL) {
     echo '<div id="status" role="alert"></div>'."\n";
     echo '<script src="//ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>'."\n";
     echo '<script src="scripts/ytca.js"></script>'."\n";
+    echo '<script src="scripts/tablesort.js"></script>'."\n";
     if ($filter) {
       echo '<p class="filterSettings">';
       echo 'Filter on. Including only ';
@@ -419,7 +424,7 @@ function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMe
   // $metaData is an array of 'keys' and 'values' for each channel; or false
 
   if ($settings['output'] == 'html') {
-    echo '<table id="report">'."\n";
+    echo '<table id="report" class="summary">'."\n";
     echo '<thead>'."\n";
     echo '<tr';
     // add a data-status attribute that's used by ytca.js to populate the status message at the top of the page
@@ -428,10 +433,9 @@ function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMe
       echo ' data-status="Processing Channel 1 of '.$numChannels.': '.$firstChannelName.'..."';
     }
     echo '>'."\n";
-    echo '<th scope="col">ID</th>'."\n";
-    echo '<th scope="col">YouTube Channel</th>'."\n";
+    echo '<th scope="col"><span>YouTube Channel</span></th>'."\n";
     if ($settings['showChannelId']) {
-      echo '<th scope="col">YouTube ID</th>'."\n";
+      echo '<th scope="col"><span>YouTube ID</span></th>'."\n";
     }
     if ($channelMeta) {
       $metaKeys = array_keys($channelMeta[0]); // get keys from first channel in array
@@ -440,24 +444,24 @@ function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMe
       // display a column header for each metaData key
       $i = 0;
       while ($i < $numMeta) {
-        echo '<th scope="col">'.$metaKeys[$i]."</th>\n";
+        echo '<th scope="col"><span>'.$metaKeys[$i]."</span></th>\n";
         $i++;
       }
     }
-    echo '<th scope="col"># Videos</th>'."\n";
-    echo '<th scope="col"># Captioned</th>'."\n";
-    echo '<th scope="col">% Captioned</th>'."\n";
-    echo '<th scope="col"># '.ucfirst($settings['timeUnit'])."</th>\n";
-    echo '<th scope="col"># '.ucfirst($settings['timeUnit']).' Captioned</th>'."\n";
-    echo '<th scope="col">Mean Views per Video</th>'."\n";
-    echo '<th scope="col">Max Views</th>'."\n";
+    echo '<th scope="col"><span># Videos</span></th>'."\n";
+    echo '<th scope="col"><span># Captioned</span></th>'."\n";
+    echo '<th scope="col"><span>% Captioned</span></th>'."\n";
+    echo '<th scope="col"><span># '.ucfirst($settings['timeUnit'])."</span></th>\n";
+    echo '<th scope="col"><span># '.ucfirst($settings['timeUnit']).' Captioned</span></th>'."\n";
+    echo '<th scope="col"><span>Mean Views per Video</span></th>'."\n";
+    echo '<th scope="col"><span>Max Views</span></th>'."\n";
     if (!$filter) {
       // no reason to separate out high traffic videos if already filtering for high traffic
-      echo '<th scope="col"># Videos High Traffic<sup>*</sup></th>'."\n";
-      echo '<th scope="col"># Captioned High Traffic<sup>*</sup></th>'."\n";
-      echo '<th scope="col">% Captioned High Traffic<sup>*</sup></th>'."\n";
-      echo '<th scope="col"># '.ucfirst($settings['timeUnit']).' High Traffic<sup>*</sup></th>'."\n";
-      echo '<th scope="col"># '.ucfirst($settings['timeUnit']).' Captioned High Traffic<sup>*</sup></th>'."\n";
+      echo '<th scope="col"><span># Videos High Traffic<sup>*</sup></span></th>'."\n";
+      echo '<th scope="col"><span># Captioned High Traffic<sup>*</sup></span></th>'."\n";
+      echo '<th scope="col"><span>% Captioned High Traffic<sup>*</sup></span></th>'."\n";
+      echo '<th scope="col"><span># '.ucfirst($settings['timeUnit']).' High Traffic<sup>*</sup></span></th>'."\n";
+      echo '<th scope="col"><span># '.ucfirst($settings['timeUnit']).' Captioned High Traffic<sup>*</sup></span></th>'."\n";
     }
     echo "</tr>\n";
     echo '</thead>'."\n";
@@ -542,10 +546,10 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
       // calculate colspan for Totals row header
       // always span ID and Name columns
       if ($settings['showChannelId']) { // span that too, plus all metadata columns
-        $colSpan = $numMeta + 3;
+        $colSpan = $numMeta + 2;
       }
       else { // span all metadata columns
-        $colSpan = $numMeta + 2;
+        $colSpan = $numMeta + 1;
       }
       echo '<th scope="row" colspan="'.$colSpan.'">TOTALS</th>'."\n";
     }
@@ -580,8 +584,6 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
         echo '"';
       }
       echo ">\n";
-
-      echo '<td>'.$rowNum."</td>\n";
     }
   }
   elseif ($settings['output'] == 'xml' && $rowNum !== 'totals') {
@@ -792,7 +794,7 @@ function showBottom($output) {
   }
 }
 
-function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$channelData,$videos,$numVideos,$filter) {
+function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$channelData,$videos,$numVideos,$filter,$sortBy) {
 
   // $channel is an array that includes 'id', 'name', plus 'videos' (an array of *unfiltered* videos)
   // $channelMeta is an array of metadata fields and their values for this channel
@@ -916,14 +918,30 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
 
     if ($settings['output'] == 'html') {
       // show table head
-      echo '<table class="videoDetails">'."\n";
+      echo '<table class="details">'."\n";
       echo '<thead>'."\n";
       echo '<tr>'."\n";
-      echo '<th scope="col">Video Title</th>'."\n";
-      echo '<th scope="col">Date</th>'."\n";
-      echo '<th scope="col">Duration</th>'."\n";
-      echo '<th scope="col">Captioned</th>'."\n";
-      echo '<th scope="col">Views</th>'."\n";
+      // title (sortable)
+      echo '<th scope="col"';
+      if ($sortBy == 'title') {
+        echo ' aria-sort="ascending"';
+      }
+      echo '><span>Video Title</span></th>'."\n";
+      // date (sortable)
+      echo '<th scope="col"';
+      if ($sortBy == 'date') {
+        echo ' aria-sort="descending"';
+      }
+      echo '><span>Date</span></th>'."\n";
+      // duration, captioned (not sortable via YouTube API)
+      echo '<th scope="col"><span>Duration</span></th>'."\n";
+      echo '<th scope="col"><span>Captioned</span></th>'."\n";
+      // views (sortable)
+      echo '<th scope="col"';
+      if ($sortBy == 'viewCount') {
+        echo ' aria-sort="descending"';
+      }
+      echo '><span>Views</span></th>'."\n";
       echo "</tr>\n";
       echo "</thead>\n";
       echo '<tbody>'."\n";
@@ -1180,11 +1198,12 @@ function getChannelMeta($channels) {
   }
 }
 
-function buildYouTubeQuery($which, $id, $apiKey, $nextPageToken=NULL) {
+function buildYouTubeQuery($which, $id, $apiKey, $sortBy=NULL, $nextPageToken=NULL) {
 
   // $which is either 'search', 'channels', or 'videos'
   // $id is a channel ID for 'search' queries; or a video ID for 'videos' query
   // For 'channels' queries $id is a username
+  // $sortBy is either 'viewCount', 'date', or 'title'
 
   if ($which == 'search') {
     // Cost = 100 units
@@ -1192,7 +1211,9 @@ function buildYouTubeQuery($which, $id, $apiKey, $nextPageToken=NULL) {
     $request .= 'key='.$apiKey;
     $request .= '&channelId='.$id;
     $request .= '&part=id,snippet';
-    $request .= '&order=viewcount';
+    if ($sortBy) {
+      $request .= '&order='.$sortBy;
+    }
     $request .= '&maxResults=50';
     if ($nextPageToken) {
       $request .= '&pageToken='.$nextPageToken;
@@ -1220,7 +1241,7 @@ function buildYouTubeQuery($which, $id, $apiKey, $nextPageToken=NULL) {
   return $request;
 }
 
-function getVideos($channelId,$json,$numVideos,$apiKey,$debug) {
+function getVideos($channelId,$json,$numVideos,$apiKey,$sortBy,$debug) {
 
   $maxResults = 50; // as defined by YouTube API
   if ($numVideos <= $maxResults) {
@@ -1250,7 +1271,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey,$debug) {
       // this is NOT the first query.
       // Therefore we need to refresh $json with the next page of data
       $nextPageToken = $json['nextPageToken'];
-      $channelQuery = buildYouTubeQuery('search',$channelId,$apiKey,$nextPageToken);
+      $channelQuery = buildYouTubeQuery('search',$channelId,$apiKey,$sortBy,$nextPageToken);
       if ($debug) {
         echo '<div class="ytca_debug ytca_channel_query">';
         echo '<span class="query_label">Channel query #'.$q.' of '.$numQueries.':</span>'."\n";
@@ -1296,7 +1317,6 @@ function getVideos($channelId,$json,$numVideos,$apiKey,$debug) {
 }
 
 function applyFilter($videos,$filter) {
-
   // $videos is an array of video data
   // $filter is an array with 'type' and 'value'
   // All filters are based on views
@@ -1315,8 +1335,6 @@ function applyFilter($videos,$filter) {
   }
   elseif ($filter['type'] == 'percentile') {
     // include only videos in the Xth percentile (based on views)
-    $videos = sortVideosByViews($videos,SORT_DESC);
-    // videos are sorted DESC (not ASC) because that's how we want to display them in the output
     $percentile = $filter['value'];
     $targetIndex = floor(($percentile/100) * $numVideos);
     $i = 0;
@@ -1328,7 +1346,6 @@ function applyFilter($videos,$filter) {
   elseif ($filter['type'] == 'count') {
     // include only videos in the Top X (based on views)
     if ($filter['value'] < $numVideos) {
-      $videos = sortVideosByViews($videos,SORT_DESC);
       $i=0;
       while ($i < $filter['value']) {
         $v[] = $videos[$i];
@@ -1355,10 +1372,6 @@ function filterBydate($videos,$filter) {
 
   $numVideos = sizeof($videos);
   if ($numVideos > 0) {
-    if (!$filter['type']) {
-      // date is the only filter; therefore sort output by date
-      $videos = sortVideosByDate($videos,SORT_DESC);
-    }
     $i = 0;
     while ($i <= $numVideos) {
       if ($filter['dateStart'] && $filter['dateEnd']) {
@@ -1382,25 +1395,17 @@ function filterBydate($videos,$filter) {
   }
 }
 
-function sortVideosByViews($videos,$sort) {
+function sortVideos($videos,$field,$direction) {
 
   // return $videos array sorted by views
-  // $sort is either SORT_ASC or SORT_DESC
+  // No longer used; results already sorted via order parameter in YouTube API query
+  // Preserved here for reference
+  // $field is any key within $videos array
+  // direction is either SORT_ASC or SORT_DESC
   foreach ($videos as $key=>$row) {
-    $views[$key] = $row['views'];
+    $sorted[$key] = $row[$field];
   }
-  array_multisort($views, $sort, $videos);
-  return $videos;
-}
-
-function sortVideosByDate($videos,$sort) {
-
-  // return $videos array sorted by date
-  // $sort is either SORT_ASC or SORT_DESC
-  foreach ($videos as $key=>$row) {
-    $videosByDate[$key] = $row['date'];
-  }
-  array_multisort($videosByDate, $sort, $videos);
+  array_multisort($sorted, $direction, $videos);
   return $videos;
 }
 
