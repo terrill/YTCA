@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>YouTube Caption Auditor (YTCA)</title>
+  <link rel="stylesheet" type="text/css" href="styles/ytca.css">
+</head>
+<body>
+<h1>YouTube Caption Auditor (YTCA)</h1>
+<p class="ytca_intro">Use the following form to generate a report regarding the indicated YouTube channel(s).
+  For YTCA source code and documentation, see <a href="https://github.com/terrill/YTCA">YTCA on GitHub</a>.</p>
+
+<form id="ytca_input" method="get" action="ytca.php">
+
+  <fieldset>
+    <legend>YouTube Channel</legend>
+    <div>
+      <label for="channelid">YouTube Channel ID:</label>
+      <input type="text" id="channelid" name="channelid">
+    </div>
+
+    <div>
+      <label for="channels">URL to Channel ini File:</label>
+      <input type="text" id="channels" name="channels">
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Output</legend>
+
+    <div>
+      <label for="report">Report Type:</label>
+      <select id="report" name="report">
+        <option value=""></option>
+        <option value="details">Details</option>
+        <option value="summary">Summary</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="output">Format:</label>
+      <select id="output" name="output">
+        <option value=""></option>
+        <option value="html">HTML</option>
+        <option value="json">JSON</option>
+        <option value="xml">XML</option>
+      </select>
+    </div>
+
+  </fieldset>
+
+
+  <fieldset>
+    <legend>Filter</legend>
+
+    <div>
+      <label for="filtertype">Filter results by:</label>
+      <select id="filtertype" name="filtertype">
+        <option value=""></option>
+        <option value="count">Top X videos (by views)</option>
+        <option value="percentile">X% most viewed videos</option>
+        <option value="views">Videos with X or more views</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="filtervalue">Filter value (X):</label>
+      <input type="text" id="filtervalue" name="filtervalue">
+    </div>
+
+  </fieldset>
+
+  <fieldset>
+    <legend>Dates</legend>
+
+    <div>
+      <label for="date-start">Published after (MMMM-DD-YY):</label>
+      <input type="text" id="date-start" name="date-start">
+    </div>
+
+    <div>
+      <label for="date-end">Published before (MMMM-DD-YY):</label>
+      <input type="text" id="date-end" name="date-end">
+    </div>
+
+  </fieldset>
+
+  <fieldset id="options">
+    <legend>Options</legend>
+
+    <div>
+      <input type="checkbox" id="show-channel-id" name="show-channel-id" value="true">
+      <label for="show-channel-id">Include a <em>Channel ID</em> column in the report (HTML Summary report only)</label>
+    </div>
+
+    <div>
+      <input type="checkbox" id="debug" name="debug" value="true">
+      <label for="debug">Debug mode (show YouTube API query URLs)</label>
+    </div>
+
+  </fieldset>
+
+  <div class="submit">
+    <input type="submit" id="submit" name="submit" value="Submit">
+    <input type="reset" id="reset" name="reset" value="Reset">
+  </div>
+
+</form>
+
+</body>
+</html>

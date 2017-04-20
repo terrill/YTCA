@@ -31,7 +31,7 @@ th, td {
   padding: 1em;
 }
 th[scope="col"] {
-  padding: 1em 0;
+  padding: 1em;
   vertical-align: bottom;
 }
 th[scope="col"]:hover {
@@ -57,18 +57,16 @@ table.details td.ccYes {
 table.details td.ccNo {
   color: #C00;
 }
+th[aria-sort] span {
+ 	background-position: center right;
+	background-repeat: no-repeat;
+  padding: 0 25px; /* wide enough for sort arrow icon */
+}
 th[aria-sort="ascending"] span {
   background-image: url('../images/sort_asc.png');
 }
 th[aria-sort="descending"] span {
   background-image: url('../images/sort_desc.png');
-}
-th[aria-sort] span {
- 	background-position: center right;
-	background-repeat: no-repeat;
-}
-th span {
-  padding: 0 25px; /* wide enough for sort arrow icon */
 }
 
 /*
@@ -130,6 +128,68 @@ div.ytca_debug span a:focus {
 }
 button::-moz-focus-inner {
   border: 0;
+}
+
+/*
+ *
+ * Front-end Form
+ *
+ */
+p#ytca_intro {
+  margin: 1em;
+  max-width: 40em;
+}
+form#ytca_input {
+  margin: 1em;
+  width: 100%;
+}
+form#ytca_input fieldset {
+  border: 2px solid #340449;
+  background-color: #EEE;
+  padding: 1em;
+  width: 20em;
+  height: 10em;
+  max-width: 90%;
+  margin: 0.5em;
+  float: left;
+}
+form#ytca_input fieldset#options {
+  width: 42em;
+  min-width: 50%;
+  max-width: 100%;
+}
+form#ytca_input fieldset legend {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+form#ytca_input div {
+  margin: 1em;
+}
+form#ytca_input label {
+  display: block;
+}
+form#ytca_input fieldset#options label {
+  display: inline;
+}
+form#ytca_input input,
+form#ytca_input select {
+  font-size: 1em;
+}
+div.submit {
+  clear: left;
+  width: 100%;
+}
+div.submit input {
+  margin: 1.5em 1em 2em;
+  font-size: 1.1em;
+  border: 2px solid #340449;
+  border-radius: 3px;
+  padding: 0.25em;
+}
+div.submit input:hover,
+div.submit input:focus {
+  background-color: #060;
+  color: #FFF;
 }
 
 /*
