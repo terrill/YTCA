@@ -162,8 +162,8 @@ if ($channelId = $_GET['channelid']) {
   if (isset($_GET['channelname'])) {
     $channels[0]['name'] = $_GET['channelname'];
   }
-  else { // use the id for channel name (can be replaced later with channel name from YouTube results)
-    $channels[0]['name'] = $channelId;
+  else { // get the channel name from YouTube
+    $channels[0]['name'] = getChannelName($apiKey,$channelId);
   }
 }
 else {
@@ -225,7 +225,7 @@ if ($numChannels > 0) {
       // this is not a valid channel ID; must be a username
       $channels[$c]['id'] = getChannelId($apiKey,$channels[$c]['id']);
     }
-    $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],$apiKey,$sortBy);
+    $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],NULL,$apiKey,$sortBy);
     // create an array of metadata for this channel (if any exists)
     $numKeys = sizeof($channels[$c]);
     if ($numKeys > 2) {
@@ -248,6 +248,10 @@ if ($numChannels > 0) {
     }
     if ($content = fileGetContents($channelQuery)) {
       $json = json_decode($content,true);
+      if ($channels[$c]['id'] == $channels[$c]['name']) {
+        // id and name are the same - reset with channel name from search results
+        $channels[$c]['name'] = $json['items'][0]['snippet']['channelTitle'];
+      }
       $numVideos = $json['pageInfo']['totalResults'];
       $channel['videoCount'] = $numVideos;
       if ($numVideos > 0) {
@@ -815,7 +819,7 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
     echo '<ul class="channelDetails">'."\n";
     // link to YouTube channel
     if ($settings['showChannelId']) {
-      $channelLink = 'https://www.youtube.com/channel/'.$channelId;
+      $channelLink = 'https://www.youtube.com/channel/'.$channel['id'];
       echo '<li><a href="'.$channelLink.'">'.$channelLink.'</a></li>'."\n";
     }
 
@@ -1129,13 +1133,23 @@ function fileGetContents($url) {
 
 function getChannelId($apiKey,$userName) {
 
-  $query = buildYouTubeQuery('channels', $userName, $apiKey);
+  $query = buildYouTubeQuery('channels', NULL, $userName, $apiKey);
   if ($content = fileGetContents($query)) {
     $json = json_decode($content,true);
     $channelId = $json['items'][0]['id'];
     if (isChannelId($channelId)) {
       return $channelId;
     }
+  }
+  return false;
+}
+
+function getChannelName($apiKey,$channelId) {
+
+  $query = buildYouTubeQuery('channels', $channelId, NULL, $apiKey);
+  if ($content = fileGetContents($query)) {
+    $json = json_decode($content,true);
+    return $json['items'][0]['snippet']['title'];
   }
   return false;
 }
@@ -1198,11 +1212,11 @@ function getChannelMeta($channels) {
   }
 }
 
-function buildYouTubeQuery($which, $id, $apiKey, $sortBy=NULL, $nextPageToken=NULL) {
+function buildYouTubeQuery($which, $id=NULL, $userName=NULL, $apiKey, $sortBy=NULL, $nextPageToken=NULL) {
 
   // $which is either 'search', 'channels', or 'videos'
   // $id is a channel ID for 'search' queries; or a video ID for 'videos' query
-  // For 'channels' queries $id is a username
+  // For 'channels' queries, $id is the channelId if known; otherwise $username is provided instead
   // $sortBy is either 'viewCount', 'date', or 'title'
 
   if ($which == 'search') {
@@ -1225,9 +1239,13 @@ function buildYouTubeQuery($which, $id, $apiKey, $sortBy=NULL, $nextPageToken=NU
     // This is currently only used for looking up channel IDs or names
     $request = 'https://www.googleapis.com/youtube/v3/channels?';
     $request .= 'key='.$apiKey;
-    $request .= '&forUsername='.$id;
-    // $request .= '&id='.$id;
-    $request .= '&part=id';
+    if ($userName) {
+      $request .= '&forUsername='.$userName;
+    }
+    elseif ($id) {
+      $request .= '&id='.$id;
+    }
+    $request .= '&part=id,snippet';
     $request .= '&maxResults=1';
   }
   elseif ($which == 'videos') {
@@ -1271,7 +1289,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey,$sortBy,$debug) {
       // this is NOT the first query.
       // Therefore we need to refresh $json with the next page of data
       $nextPageToken = $json['nextPageToken'];
-      $channelQuery = buildYouTubeQuery('search',$channelId,$apiKey,$sortBy,$nextPageToken);
+      $channelQuery = buildYouTubeQuery('search',$channelId,NULL,$apiKey,$sortBy,$nextPageToken);
       if ($debug) {
         echo '<div class="ytca_debug ytca_channel_query">';
         echo '<span class="query_label">Channel query #'.$q.' of '.$numQueries.':</span>'."\n";
@@ -1289,7 +1307,7 @@ function getVideos($channelId,$json,$numVideos,$apiKey,$sortBy,$debug) {
       $videoId = $json['items'][$i]['id']['videoId'];
       if ($videoId) {
       // get details about this video via a 'videos' query
-        $videoQuery = buildYouTubeQuery('videos', $videoId, $apiKey);
+        $videoQuery = buildYouTubeQuery('videos', $videoId, NULL, $apiKey);
         if ($debug) {
           echo '<div class="ytca_debug">';
           echo '<span class="query_label">Video query #'.$i.' of '.$finalIndex.':</span>'."\n";
