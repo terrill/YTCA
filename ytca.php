@@ -25,7 +25,7 @@ $debug = false;
 $settings['channelsFile'] = 'channels.ini';
 
 // Output (can be overwritten with parameter 'output' in URL)
-// Supported values: html, xml, json (EVENTUALLY; xml and json are not yet supported)
+// Supported values: html, xml, json
 $settings['output'] = 'html';
 
 // Report (can be overwritten with parameter 'report' in URL)

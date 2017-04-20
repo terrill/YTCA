@@ -72,6 +72,7 @@ in the Configuration block within [ytca.php][].
 * **report** - supported values are 'summary' (default; shows summary statistics for all channels) or 'details' (shows statistics for individual videos)
 * **channels** - path to an ini file that identifies all YouTube channels to be included in the analysis. See [channels.ini][] for an example.  
 * **channelid** - id of a single YouTube channel. If this parameter is passed, the specified channel will be analyzed instead of channels in the ini file. 
+* **output** - format of report; supported values are 'html' (default), 'xml', or 'json'. The latter can be used to generate custom reports or save results to a database (this functionality is not included in the repo).
 * **filtertype** - supported values are 'views', 'percentile', or 'count'. See the preceding section for details. 
 * **filtervalue** - the value associated with the chosen filter type. See the preceding section for details. 
 * **date-start** - limit results to videos published on or after this date (values must be in the form YYYY-MM-DD, e.g., 2016-01-01)
