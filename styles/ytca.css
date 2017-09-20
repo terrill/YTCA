@@ -34,7 +34,7 @@ th[scope="col"] {
   padding: 1em;
   vertical-align: bottom;
 }
-th[scope="col"]:hover {
+table.sortable th[scope="col"]:hover {
   text-decoration: underline;
   cursor: pointer;
 }

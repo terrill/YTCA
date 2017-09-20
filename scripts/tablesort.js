@@ -6,8 +6,25 @@
 
 $(document).ready(function() {
 
-  // initialize sortable table
-  $('th[scope="col"]').each(function(){
+  // Add class="sortable" to all <table> elements that meet minimum rows requirements
+  $('table').each(function() {
+    var $rows = $(this).find('tr');
+    if ($(this).hasClass('summary')) {
+      if ($rows.length >= 4) { // must have at least 2 rows, in addition to header & totals rows
+        $(this).addClass('sortable');
+        sortable = true;
+      }
+    }
+    else { // this is a details table
+      if ($rows.length >= 3) { // must have at least 2 rows, in addition to header row
+        $(this).addClass('sortable');
+        sortable = true;
+      }
+    }
+  });
+
+  // initialize headers of sortable table
+  $('table.sortable th[scope="col"]').each(function(){
 
     var thisHeader = $(this).text();
     var title = 'Click to sort by ' + thisHeader;
@@ -24,7 +41,7 @@ $(document).ready(function() {
   });
 
   // handle clicks on column headers
-  $('th[scope="col"]').on('click',function() {
+  $('table.sortable th[scope="col"]').on('click',function() {
 
     var headerText, $table, tableType, colIndex, direction, $rows, switching, lastRow,
         i, j, $rowX, $rowY, cellX, cellY, shouldSwitch, switchCount = 0;
@@ -50,17 +67,21 @@ $(document).ready(function() {
       direction = 'ascending';
     }
 
-    // remove previous aria-sort attribute
-    $('th[aria-sort]').removeAttr('aria-sort');
+    // remove previous aria-sort attribute (& restore padding to default)
+    $table.find('th[aria-sort]').removeAttr('aria-sort').removeAttr('style');
 
     // get the index of the clicked column header
     colIndex = $(this).index();
 
     switching = true;
     // Loop until there is no nore switching to do
+    // while (switching && switchCount <= 5) { // TEMP - prevent endless loop
     while (switching) {
       switching = false;
+
+      // refresh $rows after each sort
       $rows = $table.find('tr');
+
       // Loop through all table rows
       // ... except the first, which contains table headers
       // ... and the last (in the summary table), which contains totals
@@ -121,7 +142,12 @@ $(document).ready(function() {
     }
 
     // Add aria-sort to the th of the newly sorted column
-    $(this).attr('aria-sort',direction);
+    // also tweak the padding so the sort icon will fit
+    $(this).attr({
+      'aria-sort': direction,
+      'style': 'padding:1em 0'
+    });
+//    $(this).find('span').attr('padding','0 25px');
 
     // Update title
     if (direction == 'ascending') {
@@ -134,7 +160,7 @@ $(document).ready(function() {
   });
 
   // trigger click event with enter and space
-  $('th[scope="col"]').on('keypress',function (e) {
+  $('table.sortable th[scope="col"]').on('keypress',function (e) {
     var key = e.which;
     if(key == 13 || key == 32) { // enter or space
       $(this).click();
