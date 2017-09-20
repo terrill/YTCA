@@ -976,7 +976,7 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
         elseif ($videos[$i]['captions'] == 'false') {
           echo '<td class="ccNo">No</td>'."\n";
         }
-        echo '<td>'.number_format($videos[$i]['views'])."</td>\n";
+        echo '<td class="data">'.number_format($videos[$i]['views'])."</td>\n";
         echo "</tr>\n";
       }
       elseif ($settings['output'] == 'xml') {
