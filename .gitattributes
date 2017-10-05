@@ -1,3 +1,8 @@
 # Set the default behavior, in case people don't have core.autocrlf set.
 # Git will always convert line endings to LF on checkout, even on Windows
 * text eol=lf
+
+# Attempt to address problem of image files being corrupted after git push
+*.jpg binary
+*.png binary
+*.gif binary
