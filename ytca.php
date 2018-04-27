@@ -345,7 +345,9 @@ function showTop($settings,$goodColor,$badColor,$filter=NULL) {
 
   if ($settings['output'] == 'html') {
     echo "<!DOCTYPE html>\n";
+    echo '<html lang="en">'."\n";
     echo "<head>\n";
+    echo '<meta charset="utf-8">'."\n";
     echo '<title>'.$settings['title']."</title>\n";
     echo '<link rel="stylesheet" type="text/css" href="styles/ytca.css">'."\n";
     echo '<style>'."\n";
@@ -546,7 +548,7 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
     }
 
     if ($rowNum == 'totals') {
-      echo ' class="totals" data-numMeta="'.$numMeta.'" >';
+      echo ' class="totals" data-numMeta="'.$numMeta.'" >'."\n";
       // calculate colspan for Totals row header
       // always span ID and Name columns
       if ($settings['showChannelId']) { // span that too, plus all metadata columns
