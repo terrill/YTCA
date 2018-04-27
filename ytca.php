@@ -67,8 +67,6 @@ $settings['showChannelId'] = false;
 $highlights['use'] = true;
 $highlights['goodPct'] = 50; // Percentages >= this value are "good"
 $highlights['badPct'] = 0; // Percentages <= this value are "bad"
-$highlights['goodColor'] = '#99FF99'; // light green
-$highlights['badColor'] = '#FFD7D7'; // light red
 $highlights['goodLabel'] = 'Exemplary channel'; // title attribute on channel name for 'good' channels
 $highlights['badLabel'] = 'Needs work'; // title attribute on channel name for 'bad' channels
 
@@ -350,16 +348,6 @@ function showTop($settings,$goodColor,$badColor,$filter=NULL) {
     echo '<meta charset="utf-8">'."\n";
     echo '<title>'.$settings['title']."</title>\n";
     echo '<link rel="stylesheet" type="text/css" href="styles/ytca.css">'."\n";
-    echo '<style>'."\n";
-    echo "tr.goodChannel th,\n";
-    echo "tr.goodChannel td {\n";
-    echo "  background-color: $goodColor;\n";
-    echo "}\n";
-    echo "tr.badChannel th,\n";
-    echo "tr.badChannel td {\n";
-    echo "  background-color: $badColor;\n";
-    echo "}\n";
-    echo "</style>\n";
     echo "</head>\n";
     echo '<body id="ytca">'."\n";
     echo '<h1>'.$settings['title']."</h1>\n";

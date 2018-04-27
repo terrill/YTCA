@@ -48,6 +48,14 @@ td a {
 tr.totals td {
   font-weight: bold;
 }
+table.summary tr.goodChannel th,
+table.summary tr.goodChannel td {
+  background-color: #99FF99; /* light green */
+}
+table.summary tr.badChannel th,
+table.summary tr.badChannel td {
+  background-color: #FFD7D7; /* light red */
+}
 table.details {
   margin-left: 1em;
 }
