@@ -1363,7 +1363,7 @@ function applyFilter($videos,$filter) {
     else {
       // there are fewer than X videos in this channel.
       // Return all videos
-      $v = $vidoes;
+      $v = $videos;
     }
   }
   else {
