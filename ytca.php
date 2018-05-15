@@ -847,6 +847,7 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
 
     if (!$filter) {
       // high traffic data is only included for non-filtered channels
+      $pctCaptionedHighTraffic = round($channelData['ccHighTraffic']['count']/$channelData['highTraffic']['count'] * 100,1);
       echo '<li>Number of high traffic videos: <span class="value">';
       echo number_format($channelData['highTraffic']['count'])."</span></li>\n";
       echo '<li>Number captioned (high traffic): <span class="value">';
