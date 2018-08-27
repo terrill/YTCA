@@ -1069,7 +1069,7 @@ function isValid($var, $value, $filterType=NULL) {
     return true;
   }
   elseif ($var == 'date') {
-    // date-start and date-end must be in the format MMMM-YY-DD
+    // date-start and date-end must be in the format YYYY-MM-DD
     if (strlen($value) == 10) {
       $year = substr($value,0,4);
       $month = ltrim(substr($value,5,2),'0');
