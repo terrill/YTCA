@@ -1,7 +1,7 @@
 <?php
 /*
  * YouTube Captions Auditor (YTCA)
- * version 1.0.14
+ * version 1.1
  *
  */
 
@@ -17,9 +17,11 @@
 $apiKeyFile = 'apikey'; // name of local file in which API key is stored
 
 // Debug (can be overwritten with parameter 'debug' in URL)
-// Value is either true or false
-// If true, includes YouTube API query URLs in output so user can inspect raw data directly
-$debug = false;
+// Value is either 1, 2, or false (default)
+// 1 = Adds additional data to output: Expected # of videos per channel & Google cost (in units)
+// 2 = Same as 1, plus displays YouTube API query URLs in output so user can inspect raw data directly
+// Legacy value of 'true' = 2
+$settings['debug'] = false;
 
 // Path to channels ini file (can be overwritten with parameter 'channels' in URL)
 $settings['channelsFile'] = 'channels.ini';
@@ -86,9 +88,12 @@ $apiKey = file_get_contents($apiKeyFile);
 
 // Override default variables with GET params
 if (isset($_GET['debug'])) {
-  // convert to boolean; accept 'true', 'false' or 1 or 0
-  if (strtolower($_GET['debug']) == 'true' || $_GET['debug'] == '1') {
-    $debug = true;
+  // convert to boolean; accept 'true', 1 or 2
+  if (strtolower($_GET['debug']) == 'true' || $_GET['debug'] == '2') {
+    $settings['debug'] = 2;
+  }
+  elseif ($_GET['debug'] == '1') {
+    $settings['debug'] = 1;
   }
 }
 if (isset($_GET['output'])) {
@@ -146,6 +151,8 @@ if (isset($_GET['show-channel-id'])) {
   }
 }
 
+// set default vars; may be conditionally overridden
+$footnotes = NULL;
 
 showTop($settings,$highlights['goodColor'],$highlights['badColor'],$filter);
 
@@ -154,19 +161,30 @@ showTop($settings,$highlights['goodColor'],$highlights['badColor'],$filter);
 if ($channelId = $_GET['channelid']) {
   if (!(ischannelId($channelId))) {
     // this is not a valid channel ID; must be a username
-    $channelId = getChannelId($apiKey,$channelId); // returns false if this too fails
+    $channelIdArray = getChannelId($apiKey,$channelId);
+    $channelId = $channelIdArray['id']; // returns null if getChannelId() fails to return an id
+    // initiate auditing vars
+    $channelCost = $channelIdArray['cost'];
+    $channelRequests = 1;
   }
   $channels[0]['id'] = $channelId;
   if (isset($_GET['channelname'])) {
     $channels[0]['name'] = $_GET['channelname'];
   }
   else { // get the channel name from YouTube
-    $channels[0]['name'] = getChannelName($apiKey,$channelId);
+    $channelNameArray = getChannelName($apiKey,$channelId);
+    $channels[0]['name'] = $channelNameArray['name'];
+    // initiate auditing vars
+    $channelCost = $channelNameArray['cost'];
+    $channelRequests++;
   }
 }
 else {
   // get channel(s) from ini file
   $channels = parse_ini_file($settings['channelsFile'],true); // TODO: Handle syntax errors in .ini file
+  // initiate auditing vars (no API requests required so far)
+  $channelCost = 0;
+  $channelRequests = 0;
 }
 $numChannels = sizeof($channels);
 
@@ -179,6 +197,11 @@ if ($numChannels > 0) {
   $totals['all']['duration'] = 0;
   $totals['all']['views'] = 0;
   $totals['all']['maxViews'] = 0;
+  if ($settings['debug'] > 0) {
+    $totals['all']['approxCount'] = 0;
+    $totals['all']['requests'] = $channelRequests;
+    $totals['all']['cost'] = $channelCost;
+  }
 
   // captioned videos (count and duration)
   $totals['cc']['count'] = 0;
@@ -206,7 +229,7 @@ if ($numChannels > 0) {
   if ($settings['output'] == 'html') {
     if ($settings['report'] == 'summary') {
       $firstChannelName = $channels[0]['name'];
-      showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMeta,$filter);
+      $footnotes = showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMeta,$filter);
     }
   }
   elseif ($settings['output'] == 'xml') {
@@ -217,13 +240,21 @@ if ($numChannels > 0) {
   }
 
   $c = 0;
+
   while ($c < $numChannels) {
 
     if (!(ischannelId($channels[$c]['id']))) {
       // this is not a valid channel ID; must be a username
-      $channels[$c]['id'] = getChannelId($apiKey,$channels[$c]['id']);
+      // getChannelId() returns an array with 'id' and 'cost'
+      $channelIdArray = getChannelId($apiKey,$channels[$c]['id']);
+      $channels[$c]['id'] = $channelIdArray['id'];
+      $channelCost += $channelIdArray['cost'];
+      $channelRequests++;
     }
-    $channelQuery = buildYouTubeQuery('search',$channels[$c]['id'],NULL,$apiKey,$sortBy);
+    $channelQueryArray = buildYouTubeQuery('search',$channels[$c]['id'],NULL,$apiKey,$sortBy);
+    $channelQuery = $channelQueryArray['url'];
+    $channelCost += $channelQueryArray['cost'];
+    $channelRequests++;
     // create an array of metadata for this channel (if any exists)
     $numKeys = sizeof($channels[$c]);
     if ($numKeys > 2) {
@@ -238,7 +269,7 @@ if ($numChannels > 0) {
         $i++;
       }
     }
-    if ($debug) {
+    if ($settings['debug'] == 2 && $settings['output'] == 'html') {
       echo '<div class="ytca_debug ytca_channel_query">';
       echo '<span class="query_label">Initial channel query:</span>'."\n";
       echo '<span class="query_url"><a href="'.$channelQuery.'">'.$channelQuery."</a></span>\n";
@@ -250,11 +281,14 @@ if ($numChannels > 0) {
         // id and name are the same - reset with channel name from search results
         $channels[$c]['name'] = $json['items'][0]['snippet']['channelTitle'];
       }
-      $numVideos = $json['pageInfo']['totalResults'];
+      $approxNumVideos = $json['pageInfo']['totalResults'];
       $channel['videoCount'] = $numVideos;
-      if ($numVideos > 0) {
+      if ($approxNumVideos > 0) {
         // add a 'videos' key for this channel that point to all videos
-        $channels[$c]['videos'] = getVideos($channels[$c]['id'],$json,$numVideos,$apiKey,$sortBy,$debug);
+        $videosArray = getVideos($settings,$channels[$c]['id'],$json,$approxNumVideos,$apiKey,$sortBy);
+        $channels[$c]['videos'] = $videosArray;
+        $channelCost += $videosArray['cost'];
+        $channelRequests += $videosArray['requests'];
       }
       else {
         // TODO: handle error: No videos returned by $channelQuery
@@ -269,8 +303,15 @@ if ($numChannels > 0) {
     else {
       $videos = $channels[$c]['videos'];
     }
-    $numVideos = sizeof($videos);
+    // $numVideos is the *actual* number of videos returned
+    // Note that it includes 2 additional keys ('requests' and 'costs') that must be removed from the total
+    $numVideos = sizeof($videos) - 2;
     // add values to channel totals
+    if ($settings['debug'] > 0) {
+      $channelData['all']['approxCount'] = $approxNumVideos;
+      $channelData['all']['requests'] = $channelRequests;
+      $channelData['all']['cost'] = $channelCost;
+    }
     $channelData['all']['count'] = $numVideos;
     $channelData['all']['duration'] = calcDuration($videos,$numVideos);
     $viewsData = countViews($videos,$numVideos); // returns array with keys 'count' and 'max'
@@ -300,6 +341,11 @@ if ($numChannels > 0) {
       showSummaryTableRow($settings,$rowNum,$numChannels,$channels[$c],$nextChannelName,$channelMeta[$c],$channelData,$filter,$highlights);
 
       // increment totals with values from this channel
+      if ($settings['debug'] > 0) {
+        $totals['all']['approxCount'] += $channelData['all']['approxCount'];
+        $totals['all']['requests'] += $channelData['all']['requests'];
+        $totals['all']['cost'] += $channelData['all']['cost'];
+      }
       $totals['all']['count'] += $channelData['all']['count'];
       $totals['all']['duration'] +=  $channelData['all']['duration'];
       $totals['all']['views'] +=  $channelData['all']['views'];
@@ -322,18 +368,18 @@ if ($numChannels > 0) {
   if ($settings['report'] == 'summary') {
     // add totals row
     showSummaryTableRow($settings,'totals',$numChannels,NULL,NULL,$channelMeta[0],$totals,$filter);
-    showSummaryTableBottom($settings['output']);
+    showSummaryTableBottom($settings['output'],$footnotes);
   }
 }
 else {
-  // handle error - no channels were found
+  // TODO: handle error - no channels were found
 }
 showBottom($settings['output']);
 
 // stop calculating time of execution and display results
 $timeEnd = microtime(true);
 $time = round($timeEnd - $timeStart,2); // in seconds
-if ($settings['output'] == 'html' && $debug) {
+if ($settings['output'] == 'html' && $settings['debug'] == 2) {
   echo '<p class="runTime">Total run time: '.makeTimeReadable($time).'</p>'."\n";
 }
 
@@ -416,6 +462,9 @@ function showTop($settings,$goodColor,$badColor,$filter=NULL) {
 function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMeta,$filter) {
 
   // $metaData is an array of 'keys' and 'values' for each channel; or false
+  // returns an array $footnotes
+
+  $numFootnotes = 0;
 
   if ($settings['output'] == 'html') {
     echo '<table id="report" class="summary">'."\n";
@@ -442,6 +491,14 @@ function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMe
         $i++;
       }
     }
+    if ($settings['debug'] > 0) {
+      echo '<th scope="col"><span># API Requests</span></th>'."\n";
+      echo '<th scope="col"><span>API Cost (units)</span></th>'."\n";
+      // The next item has a footnote
+      $numFootnotes++;
+      $footnotes[$numFootnotes] = getFootNote('approxTotal');
+      echo '<th scope="col"><span>Approx # Videos<sup>'.$numFootnotes.'</sup></span></th>'."\n";
+    }
     echo '<th scope="col"><span># Videos</span></th>'."\n";
     echo '<th scope="col"><span># Captioned</span></th>'."\n";
     echo '<th scope="col"><span>% Captioned</span></th>'."\n";
@@ -451,11 +508,21 @@ function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMe
     echo '<th scope="col"><span>Max Views</span></th>'."\n";
     if (!$filter) {
       // no reason to separate out high traffic videos if already filtering for high traffic
-      echo '<th scope="col"><span># Videos High Traffic<sup>*</sup></span></th>'."\n";
-      echo '<th scope="col"><span># Captioned High Traffic<sup>*</sup></span></th>'."\n";
-      echo '<th scope="col"><span>% Captioned High Traffic<sup>*</sup></span></th>'."\n";
-      echo '<th scope="col"><span># '.ucfirst($settings['timeUnit']).' High Traffic<sup>*</sup></span></th>'."\n";
-      echo '<th scope="col"><span># '.ucfirst($settings['timeUnit']).' Captioned High Traffic<sup>*</sup></span></th>'."\n";
+      // The next several items share a footnote
+      $numFootnotes++;
+      $footnotes[$numFootnotes] = getFootNote('highTraffic');
+      $highTrafficHeaders[] = '# Videos High Traffic';
+      $highTrafficHeaders[] = '# Captioned High Traffic';
+      $highTrafficHeaders[] = '% Captioned High Traffic';
+      $highTrafficHeaders[] = '# '.ucfirst($settings['timeUnit']).' High Traffic';
+      $highTrafficHeaders[] = '# '.ucfirst($settings['timeUnit']).' Captioned High Traffic';
+      $numHighTrafficHeaders = sizeof($highTrafficHeaders);
+      $i=0;
+      while ($i < $numHighTrafficHeaders) {
+        echo '<th scope="col"><span>'.$highTrafficHeaders[$i];
+        echo '<sup>'.$numFootnotes.'</sup></span></th>'."\n";
+        $i++;
+      }
     }
     echo "</tr>\n";
     echo '</thead>'."\n";
@@ -467,10 +534,10 @@ function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMe
   elseif ($settings['output'] == 'json') {
     // no output generated here - see showSummaryTableRow()
   }
-
   // write output immediatley to screen
   ob_flush();
   flush();
+  return $footnotes;
 }
 
 function addMetaTags($output,$settings,$filter) {
@@ -639,6 +706,11 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
 
   // Display data
   if ($settings['output'] == 'html') {
+    if ($settings['debug'] > 0) {
+      echo '<td class="data">'.number_format($channelData['all']['requests'])."</td>\n";
+      echo '<td class="data">'.number_format($channelData['all']['cost'])."</td>\n";
+      echo '<td class="data">'.number_format($channelData['all']['approxCount'])."</td>\n";
+    }
     echo '<td class="data">'.number_format($channelData['all']['count'])."</td>\n";
     echo '<td class="data">'.number_format($channelData['cc']['count'])."</td>\n";
     echo '<td class="data">'.number_format($pctCaptioned,1)."%</td>\n";
@@ -662,6 +734,11 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
   }
   elseif ($settings['output'] == 'xml') {
     if ($rowNum !== 'totals') { // no totals in xml output
+      if ($settings['debug'] > 0) {
+        echo '<num_api_requests>'.number_format($channelData['all']['requests'])."</num_api_requests>\n";
+        echo '<api_cost>'.number_format($channelData['all']['cost'])."</api_cost>\n";
+        echo '<num_videos_est>'.number_format($channelData['all']['approxCount'])."</num_videos_est>\n";
+      }
       echo '<num_videos>'.number_format($channelData['all']['count'])."</num_videos>\n";
       echo '<num_captioned>'.number_format($channelData['cc']['count'])."</num_captioned>\n";
       echo '<pct_captioned>'.number_format($pctCaptioned,1)."</pct_captioned>\n";
@@ -699,6 +776,11 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
   }
   elseif ($settings['output'] == 'json') {
     if ($rowNum !== 'totals') { // no totals in json output
+      if ($settings['debug'] > 0) {
+        echo '"num_api_requests": "'.number_format($channelData['all']['requests']).'",'."\n";
+        echo '"api_cost": "'.number_format($channelData['all']['cost']).'",'."\n";
+        echo '"num_videos_est": "'.number_format($channelData['all']['approxCount']).'",'."\n";
+      }
       echo '"num_videos": "'.number_format($channelData['all']['count']).'",'."\n";
       echo '"num_captioned": "'.number_format($channelData['cc']['count']).'",'."\n";
       echo '"pct_captioned": "'.number_format($pctCaptioned,1).'",'."\n";
@@ -756,14 +838,25 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
   flush();
 }
 
-function showSummaryTableBottom($output) {
+function showSummaryTableBottom($output,$footnotes=NULL) {
 
   if ($output == 'html') {
     echo "</tbody>\n";
     echo "</table>\n";
 
-    echo '<p class="footnote"><sup>*</sup> "High traffic" is any video with views ';
-    echo 'greater than the mean for that channel.</p>'."\n";
+    if ($footnotes) {
+      $numFootnotes = sizeof($footnotes);
+      if ($numFootnotes > 0) {
+        $i = 1;
+        while ($i <= $numFootnotes) {
+          echo '<p class="footnote">';
+          echo '<sup>'.$i.'</sup> ';
+          echo $footnotes[$i];
+          echo "</p>\n";
+          $i++;
+        }
+      }
+    }
   }
   elseif ($output == 'xml') {
     echo "</channels>\n";
@@ -820,14 +913,30 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
       }
     }
 
-    // Number of videos - unfiltered...
-    if ($filter) {
-      echo '<li>Number of videos (unfiltered): ';
-      echo '<span class="value">'.number_format(sizeof($channel['videos'])).'</span></li>'."\n";
+    if ($settings['debug'] > 0) {
+      echo '<li>Number of API requests: <span class="value">';
+      echo number_format($channelData['all']['requests'])."</span></li>\n";
+      echo '<li>API cost (units): <span class="value">';
+      echo number_format($channelData['all']['cost'])."</span></li>\n";
+      echo '<li>Number of videos (estimated): <span class="value">';
+      echo number_format($channelData['all']['approxCount'])."</span></li>\n";
     }
-    // and filtered
-    echo '<li>Number of videos (filtered): ';
-    echo '<span class="value">'.number_format($channelData['all']['count']).'</span></li>'."\n";
+
+    // Number of videos
+    if ($filter) {
+      // if videos are filtered, show count for both filtered and unfiltered
+      echo '<li>Number of videos (unfiltered): ';
+      echo '<span class="value">'.number_format(sizeof($channel['videos'])-2).'</span></li>'."\n";
+
+      // and filtered
+      echo '<li>Number of videos (filtered): ';
+      echo '<span class="value">'.number_format($channelData['all']['count']).'</span></li>'."\n";
+    }
+    else {
+      // no filter? Show count for all videos
+      echo '<li>Number of videos: ';
+      echo '<span class="value">'.number_format($channelData['all']['count']).'</span></li>'."\n";
+    }
 
     // Number / percent captioned
     echo '<li>Number captioned: <span class="value">';
@@ -1124,25 +1233,33 @@ function fileGetContents($url) {
 
 function getChannelId($apiKey,$userName) {
 
+  // returns an array with 'id' and 'cost'
+
   $query = buildYouTubeQuery('channels', NULL, $userName, $apiKey);
-  if ($content = fileGetContents($query)) {
+  $output['cost'] = $query['cost']; // cost is charged, even if query is unsuccessful
+  $output['id'] = null; // will be replaced with channelId if successful
+  if ($content = fileGetContents($query['url'])) {
     $json = json_decode($content,true);
     $channelId = $json['items'][0]['id'];
     if (isChannelId($channelId)) {
-      return $channelId;
+      $output['id'] = $channelId;
     }
   }
-  return false;
+  return $output;
 }
 
 function getChannelName($apiKey,$channelId) {
 
+  // returns an array with 'name' and 'cost'
+
   $query = buildYouTubeQuery('channels', $channelId, NULL, $apiKey);
+  $output['cost'] = $query['cost']; // cost is charged, even if query is unsuccessful
+  $output['name'] = null; // will be replaced with channel name (title) if successful
   if ($content = fileGetContents($query)) {
     $json = json_decode($content,true);
-    return $json['items'][0]['snippet']['title'];
+    $output['name'] = $json['items'][0]['snippet']['title'];
   }
-  return false;
+  return $output;
 }
 
 function isChannelId($string) {
@@ -1209,9 +1326,12 @@ function buildYouTubeQuery($which, $id=NULL, $userName=NULL, $apiKey, $sortBy=NU
   // $id is a channel ID for 'search' queries; or a video ID for 'videos' query
   // For 'channels' queries, $id is the channelId if known; otherwise $username is provided instead
   // $sortBy is either 'viewCount', 'date', or 'title'
+  // returns an array with the following keys '
+  //  'cost' - the Google cost for executing this query
+  //  'url' -
 
   if ($which == 'search') {
-    // Cost = 100 units
+    // used for collecting data for all videos within a channel
     $request = 'https://www.googleapis.com/youtube/v3/search?';
     $request .= 'key='.$apiKey;
     $request .= '&channelId='.$id;
@@ -1223,9 +1343,11 @@ function buildYouTubeQuery($which, $id=NULL, $userName=NULL, $apiKey, $sortBy=NU
     if ($nextPageToken) {
       $request .= '&pageToken='.$nextPageToken;
     }
+    // Documentation of this method (includes cost):
+    // https://developers.google.com/youtube/v3/docs/search/list
+    $cost = 100;
   }
   elseif ($which == 'channels') {
-    // Cost = 5 units
     // Cheaper than search, but doesn't include individual video data (not even ids)
     // This is currently only used for looking up channel IDs or names
     $request = 'https://www.googleapis.com/youtube/v3/channels?';
@@ -1238,21 +1360,42 @@ function buildYouTubeQuery($which, $id=NULL, $userName=NULL, $apiKey, $sortBy=NU
     }
     $request .= '&part=id,snippet';
     $request .= '&maxResults=1';
+    // Documentation of this method (includes cost):
+    // https://developers.google.com/youtube/v3/docs/channels/list
+    // Cost = 1 unit + additional units for each specified resource part:
+    // id = 0 units
+    // snippet = 2 units
+    // Total = 3 units
+    $cost = 3;
   }
   elseif ($which == 'videos') {
-    // Cost = 5 units
+    // used for collecting data about an individual video
     $request = 'https://www.googleapis.com/youtube/v3/videos?';
     $request .= 'key='.$apiKey;
     $request .= '&id='.$id;
     $request .= '&part=contentDetails,statistics';
     $request .= '&maxResults=1';
+    // Documentation of this method (includes cost):
+    // Cost = 1 unit + additional units for each specified resource part:
+    // contentDetails = 2
+    // statistics = 2
+    // Total = 5 units
+    $cost = 5;
   }
-  return $request;
+  $query['url'] = $request;
+  $query['cost'] = $cost;
+  return $query;
 }
 
-function getVideos($channelId,$json,$numVideos,$apiKey,$sortBy,$debug) {
+function getVideos($settings,$channelId,$json,$numVideos,$apiKey,$sortBy) {
+
+  // returns an array $videos with all data for individual videos within this channel
+  // output array also includes two auditing keys: 'requests' and 'cost'
 
   $maxResults = 50; // as defined by YouTube API
+  $requests = 0; // a counter of number of calls to the API
+  $cost = 0; // a running cost for this channel
+
   if ($numVideos <= $maxResults) {
     $numQueries = 1;
     $finalBalance = $numVideos;
@@ -1279,11 +1422,17 @@ function getVideos($channelId,$json,$numVideos,$apiKey,$sortBy,$debug) {
     if ($q > 0) {
       // this is NOT the first query.
       // Therefore we need to refresh $json with the next page of data
+      $n = $q + 1;
+
       $nextPageToken = $json['nextPageToken'];
-      $channelQuery = buildYouTubeQuery('search',$channelId,NULL,$apiKey,$sortBy,$nextPageToken);
-      if ($debug) {
+      $channelQueryArray = buildYouTubeQuery('search',$channelId,NULL,$apiKey,$sortBy,$nextPageToken);
+      $channelQuery = $channelQueryArray['url'];
+      $cost += $channelQueryArray['cost'];
+      $requests++;
+
+      if ($settings['debug'] == 2 && $settings['output'] == 'html') {
         echo '<div class="ytca_debug ytca_channel_query">';
-        echo '<span class="query_label">Channel query #'.$q.' of '.$numQueries.':</span>'."\n";
+        echo '<span class="query_label">Channel query #'.$n.' of '.$numQueries.':</span>'."\n";
         echo '<span class="query_url"><a href="'.$channelQuery.'">'.$channelQuery."</a></span>\n";
         echo "</div>\n";
       }
@@ -1295,13 +1444,17 @@ function getVideos($channelId,$json,$numVideos,$apiKey,$sortBy,$debug) {
     // now step through each item in the search query results, collecting data about each video
     $i=0;
     while ($i < $finalIndex) {
+      $n = $i + 1;
       $videoId = $json['items'][$i]['id']['videoId'];
       if ($videoId) {
-      // get details about this video via a 'videos' query
-        $videoQuery = buildYouTubeQuery('videos', $videoId, NULL, $apiKey);
-        if ($debug) {
+        // get details about this video via a 'videos' query
+        $videoQueryArray = buildYouTubeQuery('videos', $videoId, NULL, $apiKey);
+        $videoQuery = $videoQueryArray['url'];
+        $cost += $videoQueryArray['cost'];
+        $requests++;
+        if ($settings['debug'] == 2 && $settings['output'] == 'html') {
           echo '<div class="ytca_debug">';
-          echo '<span class="query_label">Video query #'.$i.' of '.$finalIndex.':</span>'."\n";
+          echo '<span class="query_label">Video query #'.$n.' of '.$finalIndex.':</span>'."\n";
           echo '<span class="query_url"><a href="'.$videoQuery.'">'.$videoQuery."</a></span>\n";
           echo "</div>\n";
         }
@@ -1322,6 +1475,8 @@ function getVideos($channelId,$json,$numVideos,$apiKey,$sortBy,$debug) {
     }
     $q++;
   }
+  $videos['requests'] = $requests;
+  $videos['cost'] = $cost;
   return $videos;
 }
 
@@ -1461,9 +1616,7 @@ function calcDuration($videos,$numVideos,$captioned=NULL,$viewThreshold=NULL) {
         $duration = $videos[$i]['duration'];
       }
     }
-    if ($duration) {
-      $seconds += convertToSeconds($duration);
-    }
+    $seconds += convertToSeconds($duration);
     $i++;
   }
   return $seconds;
@@ -1507,19 +1660,30 @@ function convertToSeconds($duration) {
   // https://developers.google.com/youtube/v3/docs/videos#contentDetails.duration
   // for videos < 1 hour: "PT#M#S"
   // for videos >= 1 hour: "PT#H#M#S"
-  $interval = new DateInterval($duration);
-  return ($interval->h*3600)+($interval->i*60)+($interval->s);
+  if (!empty($duration)) {
+    $interval = new DateInterval($duration);
+    $seconds = ($interval->h*3600)+($interval->i*60)+($interval->s);
+    return $seconds;
+  }
+  else {
+    return 0;
+  }
 }
 
 function convertToHMS($duration) {
 
   // see comments above about $duration dormat
   // convert to HH:MM:SS
-  $interval = new DateInterval($duration);
-  $hours = sprintf("%02d",$interval->h);
-  $minutes = sprintf("%02d",$interval->i);
-  $seconds = sprintf("%02d",$interval->s);
-  return $hours.':'.$minutes.':'.$seconds;
+  if (!empty($duration)) {
+    $interval = new DateInterval($duration);
+    $hours = sprintf("%02d",$interval->h);
+    $minutes = sprintf("%02d",$interval->i);
+    $seconds = sprintf("%02d",$interval->s);
+    return $hours.':'.$minutes.':'.$seconds;
+  }
+  else {
+    return '00:00:00';
+  }
 }
 
 function makeTimeReadable($seconds) {
@@ -1629,5 +1793,40 @@ function showArray($array) {
   echo "<pre>\n";
   var_dump($array);
   echo "</pre>\n";
+}
+
+function getGoogleCost ($method) {
+
+  // returns cost in units, which gets applied toward user's Google API quota
+  // cost values current as of: January 10, 2020
+
+  if ($method == 'search') {
+    // https://developers.google.com/youtube/v3/docs/search/list
+    return 100;
+  }
+
+}
+
+function getFootnote($which) {
+
+  // returns the text of a particular footnote
+
+  if ($which == 'approxTotal') {
+     $text = 'The YouTube Data API returns a value <em>totalResults</em> ';
+     $text .= 'which is described in the API documentation as ';
+     $text .= '&quot;an approximation and may not represent an exact value&quot;. ';
+     $text .= 'This value is provided in the table for reference. ';
+     $text .= 'It should <em>approximately</em> equal the actual # of videos ';
+     $text .= '(reported in the adjacent column). ';
+     $text .= 'If there is a large discrepancy between these two numbers, ';
+     $text .= 'there may be videos that YTCA was unable to include in the audit for that channel. ';
+     $text .= 'Therefore, the results are likely based on a sample of videos, ';
+     $text .= 'rather than the full population.';
+  }
+  elseif ($which == 'highTraffic') {
+    $text = '&quot;High traffic&quot; is any video with views ';
+    $text .= 'greater than the mean for that channel.';
+  }
+  return $text;
 }
 ?>

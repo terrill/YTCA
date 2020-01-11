@@ -80,7 +80,7 @@ in the Configuration block within [ytca.php][].
 * **timeunit** - the unit in which "duration" values are reported. Supported values are 'seconds' (the default), 'minutes', or 'hours'
 * **title** - title of the report. Must be URL-encoded. For example, spaces must be replaced with plus signs (+) and other special characters must be replaced with their UTF-8 codes. See [W3Schools URL Encoding Reference][] for details, including a UTF-8 conversion chart.  
 * **show-channel-id** - supported values are 'true' or 'false'. If true, a YouTube Channel ID column is included in the HTML output of summary report. Default is 'false'.
-* **debug** - supported values are 'true' or 'false'. If true, includes URLs of all YouTube queries in the output so users can inspect the query and the raw data returned from YouTube in response. Default is 'false'. 
+* **debug** - supported values are 1 or 2.  If set to 1, additional data is added to the output for auditing purposes (expected # of videos per channel, number of YouTube API requests, and Google cost (in units)). If set to 2, YouTube API query URLs are displayed in output (HTML output only) so user can inspect raw data directly (useful for troubleshooting). Legacy value of 'true' is supported as a value of 2. 
 
 
 Requirements
@@ -155,13 +155,13 @@ For additional details, see [Quota usage][] in the API documentation.
 
 Quotas can be estimated using YouTube's [Quota Calculator][].  
 
-As of June 2015, quota costs associated with running this application are:
+As of January 2020, quota costs associated with running this application are:
 * 100 units for each channel (search query) 
 * 5 units for each video 
-* 5 units for each channel ID lookup from a user name
+* 3 units for each channel ID lookup from a user name
 
-For example, if you have a daily quota of 5,000,000 units you could run this application 
-to collect data from 100 channels (10,000 units) containing 998,000 videos.   
+A typical daily quota is 10,000 units per day for free (higher quotas can be requested for a fee).  
+With 10,000 units, you could run this application to collect data from 25 channels and 1,500 total videos within those channels.   
  
  
 [YouTube Data API Reference]: https://developers.google.com/youtube/v3/docs/
