@@ -1376,6 +1376,7 @@ function buildYouTubeQuery($which, $id=NULL, $userName=NULL, $apiKey, $sortBy=NU
     $request .= '&part=contentDetails,statistics';
     $request .= '&maxResults=1';
     // Documentation of this method (includes cost):
+    // https://developers.google.com/youtube/v3/docs/videos/list
     // Cost = 1 unit + additional units for each specified resource part:
     // contentDetails = 2
     // statistics = 2
