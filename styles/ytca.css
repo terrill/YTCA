@@ -143,6 +143,7 @@ button::-moz-focus-inner {
  * Front-end Form
  *
  */
+
 p#ytca_intro {
   margin: 1em;
   max-width: 40em;
@@ -165,6 +166,7 @@ form#ytca_input fieldset#options {
   width: 42em;
   min-width: 50%;
   max-width: 100%;
+  height: 20em;
 }
 form#ytca_input fieldset legend {
   font-size: 1.2em;
@@ -179,6 +181,14 @@ form#ytca_input label {
 form#ytca_input fieldset#options label {
   display: inline;
 }
+form#ytca_input fieldset#debug {
+  width: 100%;
+  height: 8em;
+  border-color: #CCC;
+}
+form#ytca_input fieldset#debug div:first-child {
+  margin-top: 0;
+}
 form#ytca_input input,
 form#ytca_input select {
   font-size: 1em;
@@ -192,7 +202,9 @@ div.submit input {
   font-size: 1.1em;
   border: 2px solid #340449;
   border-radius: 3px;
-  padding: 0.25em;
+  padding: 0.25em 0.5em;
+  color: #000;
+  background-color: #e6ffe6;
 }
 div.submit input:hover,
 div.submit input:focus {

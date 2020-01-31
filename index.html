@@ -93,10 +93,20 @@
       <label for="show-channel-id">Include a <em>Channel ID</em> column in the report (HTML Summary report only)</label>
     </div>
 
-    <div>
-      <input type="checkbox" id="debug" name="debug" value="true">
-      <label for="debug">Debug mode (show YouTube API query URLs)</label>
-    </div>
+    <fieldset id="debug">
+      <legend>Debug Mode</legend>
+      <div>
+        <input type="radio" id="debug0" name="debug" value="0" checked>
+        <label for="debug0">Off</label>
+      </div>
+      <div>
+        <input type="radio" id="debug1" name="debug" value="1">
+        <label for="debug1">Include YouTube API data in summary output</label>
+      </div>
+      <div>
+        <input type="radio" id="debug2" name="debug" value="2">
+        <label for="debug2">Include YouTube API data <em>and</em> show YouTube API query URLs</label>
+      </div>
 
   </fieldset>
 
