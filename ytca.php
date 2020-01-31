@@ -164,8 +164,8 @@ if ($channelId = $_GET['channelid']) {
     $channelIdArray = getChannelId($apiKey,$channelId);
     $channelId = $channelIdArray['id']; // returns null if getChannelId() fails to return an id
     // initiate auditing vars
-    $channelCost = $channelIdArray['cost'];
-    $channelRequests = 1;
+    $initChannelCost = $channelIdArray['cost'];
+    $initChannelRequest = 1;
   }
   $channels[0]['id'] = $channelId;
   if (isset($_GET['channelname'])) {
@@ -175,205 +175,230 @@ if ($channelId = $_GET['channelid']) {
     $channelNameArray = getChannelName($apiKey,$channelId);
     $channels[0]['name'] = $channelNameArray['name'];
     // initiate auditing vars
-    $channelCost = $channelNameArray['cost'];
-    $channelRequests++;
+    $initChannelCost = $channelNameArray['cost'];
+    $initChannelRequests++;
   }
 }
 else {
   // get channel(s) from ini file
   $channels = parse_ini_file($settings['channelsFile'],true); // TODO: Handle syntax errors in .ini file
   // initiate auditing vars (no API requests required so far)
-  $channelCost = 0;
-  $channelRequests = 0;
+  $initChannelCost = 0;
+  $initChannelRequests = 0;
 }
-$numChannels = sizeof($channels);
 
-if ($numChannels > 0) {
+if (is_array($channels)) {
 
-  // initialize $totals
+  $numChannels = sizeof($channels);
 
-  // all videos (count and duration)
-  $totals['all']['count'] = 0;
-  $totals['all']['duration'] = 0;
-  $totals['all']['views'] = 0;
-  $totals['all']['maxViews'] = 0;
-  if ($settings['debug'] > 0) {
-    $totals['all']['approxCount'] = 0;
-    $totals['all']['requests'] = $channelRequests;
-    $totals['all']['cost'] = $channelCost;
-  }
+  if ($numChannels > 0) {
 
-  // captioned videos (count and duration)
-  $totals['cc']['count'] = 0;
-  $totals['cc']['duration'] = 0;
+    // initialize $totals
 
-  if (!$filter) {
-    // no reason to separate out high traffic videos if already filtering for high traffic
-
-    // high traffic videos (count and duration)
-    $totals['highTraffic']['count'] = 0;
-    $totals['highTraffic']['duration'] = 0;
-
-    // captioned high traffic videos (count and duration)
-    $totals['ccHighTraffic']['count'] = 0;
-    $totals['ccHighTraffic']['duration'] = 0;
-  }
-
-  $channelMeta = getChannelMeta($channels); // return an array of metadata for each channel, else false
-
-  // prepare to write output immediately to screen (rather than wait for script to finish executing)
-  if (ob_get_level() == 0) {
-    ob_start();
-  }
-
-  if ($settings['output'] == 'html') {
-    if ($settings['report'] == 'summary') {
-      $firstChannelName = $channels[0]['name'];
-      $footnotes = showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMeta,$filter);
-    }
-  }
-  elseif ($settings['output'] == 'xml') {
-    echo '<channels>'."\n";
-  }
-  elseif ($settings['output'] == 'json') {
-    echo '"channels": ['."\n";
-  }
-
-  $c = 0;
-
-  while ($c < $numChannels) {
-
-    if (!(ischannelId($channels[$c]['id']))) {
-      // this is not a valid channel ID; must be a username
-      // getChannelId() returns an array with 'id' and 'cost'
-      $channelIdArray = getChannelId($apiKey,$channels[$c]['id']);
-      $channels[$c]['id'] = $channelIdArray['id'];
-      $channelCost += $channelIdArray['cost'];
-      $channelRequests++;
-    }
-    $channelQueryArray = buildYouTubeQuery('search',$channels[$c]['id'],NULL,$apiKey,$sortBy);
-    $channelQuery = $channelQueryArray['url'];
-    $channelCost += $channelQueryArray['cost'];
-    $channelRequests++;
-    // create an array of metadata for this channel (if any exists)
-    $numKeys = sizeof($channels[$c]);
-    if ($numKeys > 2) {
-      // there is supplemental meta data in the array
-      $keys = array_keys($channels[$c]);
-      $i = 0;
-      while ($i < $numKeys) {
-        $key = $keys[$i];
-        if ($key !== 'name' && $key !== 'id') {
-          $metaKeys[] = $key;
-        }
-        $i++;
-      }
-    }
-    if ($settings['debug'] == 2 && $settings['output'] == 'html') {
-      echo '<div class="ytca_debug ytca_channel_query">';
-      echo '<span class="query_label">Initial channel query:</span>'."\n";
-      echo '<span class="query_url"><a href="'.$channelQuery.'">'.$channelQuery."</a></span>\n";
-      echo "</div>\n";
-    }
-    if ($content = fileGetContents($channelQuery)) {
-      $json = json_decode($content,true);
-      if ($channels[$c]['id'] == $channels[$c]['name']) {
-        // id and name are the same - reset with channel name from search results
-        $channels[$c]['name'] = $json['items'][0]['snippet']['channelTitle'];
-      }
-      $approxNumVideos = $json['pageInfo']['totalResults'];
-      $channel['videoCount'] = $numVideos;
-      if ($approxNumVideos > 0) {
-        // add a 'videos' key for this channel that point to all videos
-        $videosArray = getVideos($settings,$channels[$c]['id'],$json,$approxNumVideos,$apiKey,$sortBy);
-        $channels[$c]['videos'] = $videosArray;
-        $channelCost += $videosArray['cost'];
-        $channelRequests += $videosArray['requests'];
-      }
-      else {
-        // TODO: handle error: No videos returned by $channelQuery
-      }
-    }
-    else {
-      // TODO: handle error: Unable to retrieve file: $channelQuery
-    }
-    if ($filter) {
-      $videos = applyFilter($channels[$c]['videos'],$filter);
-    }
-    else {
-      $videos = $channels[$c]['videos'];
-    }
-    // $numVideos is the *actual* number of videos returned
-    // Note that it includes 2 additional keys ('requests' and 'costs') that must be removed from the total
-    $numVideos = sizeof($videos) - 2;
-    // add values to channel totals
+    // all videos (count and duration)
+    $totals['all']['count'] = 0;
+    $totals['all']['duration'] = 0;
+    $totals['all']['views'] = 0;
+    $totals['all']['maxViews'] = 0;
     if ($settings['debug'] > 0) {
-      $channelData['all']['approxCount'] = $approxNumVideos;
-      $channelData['all']['requests'] = $channelRequests;
-      $channelData['all']['cost'] = $channelCost;
+      $totals['all']['approxCount'] = 0;
+      $totals['all']['requests'] = $initChannelRequests;
+      $totals['all']['cost'] = $initChannelCost;
     }
-    $channelData['all']['count'] = $numVideos;
-    $channelData['all']['duration'] = calcDuration($videos,$numVideos);
-    $viewsData = countViews($videos,$numVideos); // returns array with keys 'count' and 'max'
-    $channelData['all']['views'] = $viewsData['count'];
-    $channelData['all']['maxViews'] = $viewsData['max'];
-    $channelData['all']['avgViews'] = round($channelData['all']['views']/$channelData['all']['count']);
-    $channelData['cc']['count'] = countCaptioned($videos,$numVideos);
-    $channelData['cc']['duration'] = calcDuration($videos,$numVideos,'true');
+
+    // captioned videos (count and duration)
+    $totals['cc']['count'] = 0;
+    $totals['cc']['duration'] = 0;
+
     if (!$filter) {
       // no reason to separate out high traffic videos if already filtering for high traffic
-      $highTrafficThreshold = $channelData['all']['avgViews'];
-      $channelData['highTraffic']['count'] = countHighTraffic($videos,$numVideos,$highTrafficThreshold);
-      $channelData['highTraffic']['duration'] = calcDuration($videos,$numVideos,NULL,$highTrafficThreshold);
-      $channelData['ccHighTraffic']['count'] = countCaptioned($videos,$numVideos,$highTrafficThreshold);
-      $channelData['ccHighTraffic']['duration'] = calcDuration($videos,$numVideos,'true',$highTrafficThreshold);
-    }
-    $rowNum = $c + 1;
-    if ($rowNum < $numChannels) {
-      $nextChannelName = $channels[$rowNum]['name'];
+
+      // high traffic videos (count and duration)
+      $totals['highTraffic']['count'] = 0;
+      $totals['highTraffic']['duration'] = 0;
+
+      // captioned high traffic videos (count and duration)
+      $totals['ccHighTraffic']['count'] = 0;
+      $totals['ccHighTraffic']['duration'] = 0;
     }
 
-    if ($settings['report'] == 'details') {
-      // show details for this channel
-      showDetails($settings,$rowNum,$numChannels,$channels[$c],$channelMeta[$c],$channelData,$videos,$numVideos,$filter,$sortBy);
-    }
-    else { // show a summary report
-      showSummaryTableRow($settings,$rowNum,$numChannels,$channels[$c],$nextChannelName,$channelMeta[$c],$channelData,$filter,$highlights);
+    $channelMeta = getChannelMeta($channels); // return an array of metadata for each channel, else false
 
-      // increment totals with values from this channel
+    if (function_exists('array_key_first')) { // function introduced in PHP 7.3.0
+      $k = array_key_first($channels);
+    }
+    else {
+      $k = getFirstKey($channels);
+    }
+
+    if (function_exists('array_key_last')) { // function introduced in PHP 7.3.0
+      $lastKey = array_key_last($channels);
+    }
+    else {
+      $lastKey = getLastKey($channels);
+    }
+
+    $c = 0; // counter
+
+
+    // prepare to write output immediately to screen (rather than wait for script to finish executing)
+    if (ob_get_level() == 0) {
+      ob_start();
+    }
+
+    if ($settings['output'] == 'html') {
+      if ($settings['report'] == 'summary') {
+        $firstChannelName = $channels[$k]['name'];
+        $footnotes = showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMeta,$filter);
+      }
+    }
+    elseif ($settings['output'] == 'xml') {
+      echo '<channels>'."\n";
+    }
+    elseif ($settings['output'] == 'json') {
+      echo '"channels": ['."\n";
+    }
+
+    // Step through each channel
+    while ($k <= $lastKey) {
+
+      $channelRequests = $initChannelRequests;
+      $channelCost = $initChannelCost;
+
+      if (!(ischannelId($channels[$k]['id']))) {
+        // this is not a valid channel ID; must be a username
+        // getChannelId() returns an array with 'id' and 'cost'
+        $channelIdArray = getChannelId($apiKey,$channels[$k]['id']);
+        $channels[$k]['id'] = $channelIdArray['id'];
+        $channelCost += $channelIdArray['cost'];
+        $channelRequests++;
+      }
+      $channelQueryArray = buildYouTubeQuery('search',$channels[$k]['id'],NULL,$apiKey,$sortBy);
+      $channelQuery = $channelQueryArray['url'];
+      $channelCost += $channelQueryArray['cost'];
+      $channelRequests++;
+      // create an array of metadata for this channel (if any exists)
+      $numKeys = sizeof($channels[$k]);
+      if ($numKeys > 2) {
+        // there is supplemental meta data in the array
+        $keys = array_keys($channels[$k]);
+        $i = 0;
+        while ($i < $numKeys) {
+          $key = $keys[$i];
+          if ($key !== 'name' && $key !== 'id') {
+            $metaKeys[] = $key;
+          }
+          $i++;
+        }
+      }
+      if ($settings['debug'] == 2 && $settings['output'] == 'html') {
+        echo '<div class="ytca_debug ytca_channel_query">';
+        echo '<span class="query_label">Initial channel query:</span>'."\n";
+        echo '<span class="query_url"><a href="'.$channelQuery.'">'.$channelQuery."</a></span>\n";
+        echo "</div>\n";
+      }
+      if ($content = fileGetContents($channelQuery)) {
+        $json = json_decode($content,true);
+        if ($channels[$k]['id'] == $channels[$k]['name']) {
+          // id and name are the same - reset with channel name from search results
+          $channels[$k]['name'] = $json['items'][0]['snippet']['channelTitle'];
+        }
+        $approxNumVideos = $json['pageInfo']['totalResults'];
+        $channel['videoCount'] = $numVideos;
+        if ($approxNumVideos > 0) {
+          // add a 'videos' key for this channel that point to all videos
+          $videosArray = getVideos($settings,$channels[$k]['id'],$json,$approxNumVideos,$apiKey,$sortBy);
+          $channels[$k]['videos'] = $videosArray;
+          $channelCost += $videosArray['cost'];
+          $channelRequests += $videosArray['requests'];
+        }
+        else {
+          // TODO: handle error: No videos returned by $channelQuery
+        }
+      }
+      else {
+        // TODO: handle error: Unable to retrieve file: $channelQuery
+      }
+      if ($filter) {
+        $videos = applyFilter($channels[$k]['videos'],$filter);
+      }
+      else {
+        $videos = $channels[$k]['videos'];
+      }
+      // $numVideos is the *actual* number of videos returned
+      // Note that it includes 2 additional keys ('requests' and 'costs') that must be removed from the total
+      $numVideos = sizeof($videos) - 2;
+      // add values to channel totals
       if ($settings['debug'] > 0) {
-        $totals['all']['approxCount'] += $channelData['all']['approxCount'];
-        $totals['all']['requests'] += $channelData['all']['requests'];
-        $totals['all']['cost'] += $channelData['all']['cost'];
+        $channelData['all']['approxCount'] = $approxNumVideos;
+        $channelData['all']['requests'] = $channelRequests;
+        $channelData['all']['cost'] = $channelCost;
       }
-      $totals['all']['count'] += $channelData['all']['count'];
-      $totals['all']['duration'] +=  $channelData['all']['duration'];
-      $totals['all']['views'] +=  $channelData['all']['views'];
-      if ($channelData['all']['maxViews'] > $totals['all']['maxViews']) {
-        $totals['all']['maxViews'] = $channelData['all']['maxViews'];
-      }
-      $totals['cc']['count'] += $channelData['cc']['count'];
-      $totals['cc']['duration'] += $channelData['cc']['duration'];
+      $channelData['all']['count'] = $numVideos;
+      $channelData['all']['duration'] = calcDuration($videos,$numVideos);
+      $viewsData = countViews($videos,$numVideos); // returns array with keys 'count' and 'max'
+      $channelData['all']['views'] = $viewsData['count'];
+      $channelData['all']['maxViews'] = $viewsData['max'];
+      $channelData['all']['avgViews'] = round($channelData['all']['views']/$channelData['all']['count']);
+      $channelData['cc']['count'] = countCaptioned($videos,$numVideos);
+      $channelData['cc']['duration'] = calcDuration($videos,$numVideos,'true');
       if (!$filter) {
         // no reason to separate out high traffic videos if already filtering for high traffic
-        $totals['highTraffic']['count'] += $channelData['highTraffic']['count'];
-        $totals['highTraffic']['duration'] += $channelData['highTraffic']['duration'];
-        $totals['ccHighTraffic']['count'] += $channelData['ccHighTraffic']['count'];
-        $totals['ccHighTraffic']['duration'] += $channelData['ccHighTraffic']['duration'];
+        $highTrafficThreshold = $channelData['all']['avgViews'];
+        $channelData['highTraffic']['count'] = countHighTraffic($videos,$numVideos,$highTrafficThreshold);
+        $channelData['highTraffic']['duration'] = calcDuration($videos,$numVideos,NULL,$highTrafficThreshold);
+        $channelData['ccHighTraffic']['count'] = countCaptioned($videos,$numVideos,$highTrafficThreshold);
+        $channelData['ccHighTraffic']['duration'] = calcDuration($videos,$numVideos,'true',$highTrafficThreshold);
       }
-    }
-    $c++;
-  }
+      $rowNum = $c + 1;
+      if ($rowNum < $numChannels) {
+        $nextChannelName = $channels[$rowNum]['name'];
+      }
 
-  if ($settings['report'] == 'summary') {
-    // add totals row
-    showSummaryTableRow($settings,'totals',$numChannels,NULL,NULL,$channelMeta[0],$totals,$filter);
-    showSummaryTableBottom($settings['output'],$footnotes);
+      if ($settings['report'] == 'details') {
+        // show details for this channel
+        showDetails($settings,$rowNum,$numChannels,$channels[$k],$channelMeta[$k],$channelData,$videos,$numVideos,$filter,$sortBy);
+      }
+      else { // show a summary report
+        showSummaryTableRow($settings,$rowNum,$numChannels,$channels[$k],$nextChannelName,$channelMeta[$k],$channelData,$filter,$highlights);
+
+        // increment totals with values from this channel
+        if ($settings['debug'] > 0) {
+          $totals['all']['approxCount'] += $channelData['all']['approxCount'];
+          $totals['all']['requests'] += $channelData['all']['requests'];
+          $totals['all']['cost'] += $channelData['all']['cost'];
+        }
+        $totals['all']['count'] += $channelData['all']['count'];
+        $totals['all']['duration'] +=  $channelData['all']['duration'];
+        $totals['all']['views'] +=  $channelData['all']['views'];
+        if ($channelData['all']['maxViews'] > $totals['all']['maxViews']) {
+          $totals['all']['maxViews'] = $channelData['all']['maxViews'];
+        }
+        $totals['cc']['count'] += $channelData['cc']['count'];
+        $totals['cc']['duration'] += $channelData['cc']['duration'];
+        if (!$filter) {
+          // no reason to separate out high traffic videos if already filtering for high traffic
+          $totals['highTraffic']['count'] += $channelData['highTraffic']['count'];
+          $totals['highTraffic']['duration'] += $channelData['highTraffic']['duration'];
+          $totals['ccHighTraffic']['count'] += $channelData['ccHighTraffic']['count'];
+          $totals['ccHighTraffic']['duration'] += $channelData['ccHighTraffic']['duration'];
+        }
+      }
+      $c++;
+      $k++;
+    }
+
+    if ($settings['report'] == 'summary') {
+      // add totals row
+      showSummaryTableRow($settings,'totals',$numChannels,NULL,NULL,$channelMeta[0],$totals,$filter);
+      showSummaryTableBottom($settings['output'],$footnotes);
+    }
+  } // end if $numChannels > 0
+  else {
+    // TODO: handle error - no channels were found
   }
-}
-else {
-  // TODO: handle error - no channels were found
-}
+} // end if $channels in an array
+
 showBottom($settings['output']);
 
 // stop calculating time of execution and display results
@@ -1830,4 +1855,25 @@ function getFootnote($which) {
   }
   return $text;
 }
+
+function getFirstKey($channels) {
+
+  // return the first key of the array $channels
+  // channels in ini file must be numbered sequentially
+  // but they can start at any number
+  // (useful if an audit needs to be restarted halfway through a list of channels)
+  foreach($channels as $key => $unused) {
+    return $key;
+  }
+  return NULL;
+}
+
+function getLastKey($channels) {
+
+  // return the last key of the array $channels
+  end($channels);
+  $key = key($channels);
+  return $key;
+}
+
 ?>
