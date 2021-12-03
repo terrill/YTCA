@@ -161,7 +161,10 @@ As of January 2020, quota costs associated with running this application are:
 * 3 units for each channel ID lookup from a user name
 
 A typical daily quota is 10,000 units per day for free (higher quotas can be requested for a fee).  
-With 10,000 units, you could run this application to collect data from 25 channels and 1,500 total videos within those channels.   
+With 10,000 units, you could run this application to collect data from 25 channels and 1,500 total videos within those channels.  
+
+### Quotas for Large Channels
+YouTube limits the number of videos you can query for a specific channelID to a maximum of 500 videos (see [channelID Search Parameter Documentation][]). You can get around this limitation in YTCA by setting the "Published after" and "Published before" parameters to dates that include 500 videos or less. 
  
  
 [YouTube Data API Reference]: https://developers.google.com/youtube/v3/docs/
@@ -170,3 +173,4 @@ With 10,000 units, you could run this application to collect data from 25 channe
 [W3Schools URL Encoding Reference]: https://www.w3schools.com/tags/ref_urlencode.asp
 [channels.ini]: channels.ini
 [ytca.php]: ytca.php
+[channelID Search Parameter Documentation]: https://developers.google.com/youtube/v3/docs/search/list#channelId
