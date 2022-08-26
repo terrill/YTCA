@@ -150,7 +150,7 @@ plus a Yes/No field showing whether each video is captioned.
 About Quotas
 ------------
 
-The YouTube Data API has a limit on how many API queries can be executed per day. 
+The YouTube Data API has a limit on how many [API][] queries can be executed per day. 
 For additional details, see [Quota usage][] in the API documentation.
 
 Quotas can be estimated using YouTube's [Quota Calculator][].  
@@ -170,3 +170,4 @@ With 10,000 units, you could run this application to collect data from 25 channe
 [W3Schools URL Encoding Reference]: https://www.w3schools.com/tags/ref_urlencode.asp
 [channels.ini]: channels.ini
 [ytca.php]: ytca.php
+[API]: https://www.scaler.com/topics/api-full-form/
