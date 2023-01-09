@@ -1360,6 +1360,19 @@ function buildYouTubeQuery($which, $id=NULL, $userName=NULL, $apiKey, $sortBy=NU
     $request = 'https://www.googleapis.com/youtube/v3/search?';
     $request .= 'key='.$apiKey;
     $request .= '&channelId='.$id;
+     // check if date-start is set
+    if (isset($_GET['date-start'])) {
+      if (isValid('date',$_GET['date-start'])) {
+        $request .= '&publishedAfter='.formatDateForYoutube($_GET['date-start']);
+      }
+    }
+
+    // check if date-start is set
+    if (isset($_GET['date-end'])) {
+      if (isValid('date',$_GET['date-end'])) {
+        $request .= '&publishedBefore='.formatDateForYoutube($_GET['date-end']);
+      }
+    }
     $request .= '&part=id,snippet';
     if ($sortBy) {
       $request .= '&order='.$sortBy;
@@ -1553,7 +1566,7 @@ function applyFilter($videos,$filter) {
     $v = $videos;
   }
   if ($filter['dateStart'] || $filter['dateEnd']) {
-    $v = filterByDate($v,$filter);
+    // $v = filterByDate($v,$filter);
   }
   return $v;
 }
@@ -1875,5 +1888,10 @@ function getLastKey($channels) {
   $key = key($channels);
   return $key;
 }
+
+function formatDateForYoutube($date) {
+  // YYY-MM-DD -> YYYY-MM-DDT00:00:00Z
+
+  return trim($date)."T00:00:00Z";
 
 ?>
