@@ -189,7 +189,7 @@ else {
 
 if (is_array($channels)) {
 
-  $numChannels = sizeof($channels);
+  $numChannels = count($channels);
 
   if ($numChannels > 0) {
 
@@ -278,7 +278,7 @@ if (is_array($channels)) {
       $channelCost += $channelQueryArray['cost'];
       $channelRequests++;
       // create an array of metadata for this channel (if any exists)
-      $numKeys = sizeof($channels[$k]);
+      $numKeys = count($channels[$k]);
       if ($numKeys > 2) {
         // there is supplemental meta data in the array
         $keys = array_keys($channels[$k]);
@@ -327,7 +327,7 @@ if (is_array($channels)) {
       }
       // $numVideos is the *actual* number of videos returned
       // Note that it includes 2 additional keys ('requests' and 'costs') that must be removed from the total
-      $numVideos = sizeof($videos) - 2;
+      $numVideos = count($videos) - 2;
       // add values to channel totals
       if ($settings['debug'] > 0) {
         $channelData['all']['approxCount'] = $approxNumVideos;
@@ -507,7 +507,7 @@ function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMe
     }
     if ($channelMeta) {
       $metaKeys = array_keys($channelMeta[0]); // get keys from first channel in array
-      $numMeta = sizeof($metaKeys);
+      $numMeta = count($metaKeys);
       // there is supplemental meta data
       // display a column header for each metaData key
       $i = 0;
@@ -541,7 +541,7 @@ function showSummaryTableTop($settings,$numChannels,$firstChannelName,$channelMe
       $highTrafficHeaders[] = '% Captioned High Traffic';
       $highTrafficHeaders[] = '# '.ucfirst($settings['timeUnit']).' High Traffic';
       $highTrafficHeaders[] = '# '.ucfirst($settings['timeUnit']).' Captioned High Traffic';
-      $numHighTrafficHeaders = sizeof($highTrafficHeaders);
+      $numHighTrafficHeaders = count($highTrafficHeaders);
       $i=0;
       while ($i < $numHighTrafficHeaders) {
         echo '<th scope="col"><span>'.$highTrafficHeaders[$i];
@@ -605,7 +605,7 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
   // $rowNum is either an integer, or 'totals'
   // $channel, $metaData, and $channelData are all arrays
 
-  $numMeta = sizeof($metaData);
+  $numMeta = count($metaData);
 
   // calculate percentages and averages
   $pctCaptioned = round($channelData['cc']['count']/$channelData['all']['count'] * 100,1);
@@ -657,10 +657,10 @@ function showSummaryTableRow($settings,$rowNum,$numChannels,$channel=NULL,$nextC
           $classes[] = 'meta_'.$value;
         }
       }
-      if (is_array($classes) && sizeof($classes) > 0) {
+      if (is_array($classes) && count($classes) > 0) {
         echo ' class="';
         $i=0;
-        while ($i < sizeof($classes)) {
+        while ($i < count($classes)) {
           if ($i > 0) {
             echo ' ';
           }
@@ -870,7 +870,7 @@ function showSummaryTableBottom($output,$footnotes=NULL) {
     echo "</table>\n";
 
     if ($footnotes) {
-      $numFootnotes = sizeof($footnotes);
+      $numFootnotes = count($footnotes);
       if ($numFootnotes > 0) {
         $i = 1;
         while ($i <= $numFootnotes) {
@@ -912,9 +912,9 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
   // $channelMeta is an array of metadata fields and their values for this channel
   // $channelData is an array of statistical summary data for this channel
   // $videos is an array of *filtered* videos (if filters are used, this is a subset of $channel['videos'])
-
-  $numMeta = sizeof($channelMeta);
-
+  if (is_countable($channelMeta)){
+  $numMeta = count($channelMeta);
+  }
   // calculate percentages
   $pctCaptioned = round($channelData['cc']['count']/$channelData['all']['count'] * 100,1);
 
@@ -951,7 +951,7 @@ function showDetails($settings,$rowNum,$numChannels,$channel,$channelMeta,$chann
     if ($filter) {
       // if videos are filtered, show count for both filtered and unfiltered
       echo '<li>Number of videos (unfiltered): ';
-      echo '<span class="value">'.number_format(sizeof($channel['videos'])-2).'</span></li>'."\n";
+      echo '<span class="value">'.number_format(count($channel['videos'])-2).'</span></li>'."\n";
 
       // and filtered
       echo '<li>Number of videos (filtered): ';
@@ -1305,9 +1305,9 @@ function getChannelMeta($channels) {
 
   // first, retrieve all metadata keys
   $i=0;
-  while ($i < sizeof($channels)) {
+  while ($i < count($channels)) {
     $keys = array_keys($channels[$i]);
-    $numKeys = sizeof($keys);
+    $numKeys = count($keys);
     if ($numKeys > 2) {
       // this channel has meta keys
       $j=0;
@@ -1326,10 +1326,12 @@ function getChannelMeta($channels) {
   }
   // second, if metadata keys were found,
   // build an array of each channel's data for each key
-  $numMeta = sizeof($metaKeys);
+  if (is_countable($metaKeys)){
+  $numMeta = count($metaKeys);
+  }
   if ($numMeta > 0) {
     $i=0;
-    while ($i < sizeof($channels)) {
+    while ($i < count($channels)) {
       $j=0;
       while ($j < $numMeta) {
         $key = $metaKeys[$j];
@@ -1360,6 +1362,19 @@ function buildYouTubeQuery($which, $id=NULL, $userName=NULL, $apiKey, $sortBy=NU
     $request = 'https://www.googleapis.com/youtube/v3/search?';
     $request .= 'key='.$apiKey;
     $request .= '&channelId='.$id;
+     // check if date-start is set
+    if (isset($_GET['date-start'])) {
+      if (isValid('date',$_GET['date-start'])) {
+        $request .= '&publishedAfter='.formatDateForYoutube($_GET['date-start']);
+      }
+    }
+
+    // check if date-start is set
+    if (isset($_GET['date-end'])) {
+      if (isValid('date',$_GET['date-end'])) {
+        $request .= '&publishedBefore='.formatDateForYoutube($_GET['date-end']);
+      }
+    }
     $request .= '&part=id,snippet';
     if ($sortBy) {
       $request .= '&order='.$sortBy;
@@ -1511,7 +1526,7 @@ function applyFilter($videos,$filter) {
   // $filter is an array with 'type' and 'value'
   // All filters are based on views
   // First, must sort $videos array by views DESC
-  $numVideos = sizeof($videos);
+  $numVideos = count($videos);
 
   if ($filter['type'] == 'views') {
     // include only videos with X views
@@ -1553,14 +1568,14 @@ function applyFilter($videos,$filter) {
     $v = $videos;
   }
   if ($filter['dateStart'] || $filter['dateEnd']) {
-    $v = filterByDate($v,$filter);
+    // $v = filterByDate($v,$filter);
   }
   return $v;
 }
 
 function filterBydate($videos,$filter) {
 
-  $numVideos = sizeof($videos);
+  $numVideos = count($videos);
   if ($numVideos > 0) {
     $i = 0;
     while ($i <= $numVideos) {
@@ -1876,4 +1891,9 @@ function getLastKey($channels) {
   return $key;
 }
 
+function formatDateForYoutube($date) {
+  // YYY-MM-DD -> YYYY-MM-DDT00:00:00Z
+
+  return trim($date)."T00:00:00Z";
+}
 ?>
